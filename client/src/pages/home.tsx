@@ -2,74 +2,16 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocation } from "wouter"; // Fixed import
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-
-const ApiTester = () => {
-  const { toast } = useToast();
-  const [apiUrl, setApiUrl] = useState("");
-  const [result, setResult] = useState<any>(null);
-
-  const testApi = async () => {
-    try {
-      const response = await fetch("/api/test-api", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: apiUrl }),
-      });
-
-      const data = await response.json();
-      setResult(data);
-
-      toast({
-        title: "API Test Successful",
-        description: "The API endpoint was tested successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to test API endpoint",
-        variant: "destructive",
-      });
-    }
-  };
-
-  return (
-    <div className="container mx-auto p-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>API Tester</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter API URL"
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-            />
-            <Button onClick={testApi}>Test API</Button>
-          </div>
-          {result && (
-            <pre className="mt-4 p-4 bg-gray-100 rounded overflow-auto">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
-import { Loader2, Copy, Wand2, Upload, RefreshCw, Globe } from "lucide-react";
-import type { FilterOption, SortOption } from "@shared/schema";
+import { Loader2, Wand2, Upload, Globe } from "lucide-react";
+import Scene3D from "@/components/Scene3D";
 
 const examplePrompts = [
   "rick and morty characters",
@@ -81,10 +23,8 @@ const examplePrompts = [
 const httpMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
 
 export default function Home() {
+  const [, setLocation] = useLocation(); // Fixed navigation
   const [prompt, setPrompt] = useState("");
-  const [result, setResult] = useState<any>(null);
-  const [enhancePrompt, setEnhancePrompt] = useState("");
-  const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
   const [showApiDialog, setShowApiDialog] = useState(false);
   const [apiUrl, setApiUrl] = useState("");
   const [apiMethod, setApiMethod] = useState("GET");
@@ -111,16 +51,9 @@ export default function Home() {
   });
 
   const promptMutation = useMutation({
-    mutationFn: async (input: { prompt: string; context?: string }) => {
-      const options: { prompt: string; filterOptions?: FilterOption; sortOptions?: SortOption } = {
-        prompt: input.context ?
-          `Context: ${input.context}\nNew request: ${input.prompt}` :
-          input.prompt
-      };
-      return generateFromPrompt(options.prompt);
-    },
+    mutationFn: generateFromPrompt,
     onSuccess: (data) => {
-      setResult(data);
+      setLocation(`/preview/${data.id}`);
       toast({
         title: "Success",
         description: "JSON data generated successfully",
@@ -138,7 +71,7 @@ export default function Home() {
   const fileMutation = useMutation({
     mutationFn: generateFromFile,
     onSuccess: (data) => {
-      setResult(data);
+      setLocation(`/preview/${data.id}`);
       toast({
         title: "Success",
         description: "File processed successfully",
@@ -176,14 +109,13 @@ export default function Home() {
           throw new Error('API request failed');
         }
 
-        const data = await response.json();
-        return data;
+        return await response.json();
       } catch (error: any) {
         throw new Error(error.message || 'Failed to fetch API data');
       }
     },
     onSuccess: (data) => {
-      setResult(data);
+      setLocation(`/preview/${data.id}`);
       setShowApiDialog(false);
       toast({
         title: "Success",
@@ -199,42 +131,13 @@ export default function Home() {
     },
   });
 
-  const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied",
-      description: "API URL copied to clipboard",
-    });
-  };
-
-  const handleEnhanceSubmit = async () => {
-    try {
-      // Pass both the current data and enhancement prompt
-      const enhanced = await promptMutation.mutateAsync({
-        prompt: enhancePrompt,
-        context: JSON.stringify(result.jsonData) // Pass current JSON data as context
-      });
-      setResult(enhanced);
-      setShowEnhanceDialog(false);
-      setEnhancePrompt("");
-      toast({
-        title: "Success",
-        description: "Data enhanced with AI",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const isLoading = promptMutation.isPending || fileMutation.isPending || apiMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4 space-y-8">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <Scene3D />
+
+      <div className="container mx-auto py-8 px-4 space-y-8 relative">
         <div className="space-y-4 text-center max-w-3xl mx-auto">
           <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             JSON Data AI
@@ -244,7 +147,7 @@ export default function Home() {
           </p>
         </div>
 
-        <Card className="max-w-3xl mx-auto">
+        <Card className="max-w-3xl mx-auto backdrop-blur-sm bg-background/80">
           <CardContent className="pt-6 space-y-6">
             <div className="relative">
               <Textarea
@@ -255,7 +158,7 @@ export default function Home() {
               />
               <Button
                 className="absolute right-2 top-2"
-                onClick={() => promptMutation.mutate({ prompt })}
+                onClick={() => promptMutation.mutate(prompt)}
                 disabled={!prompt || isLoading}
               >
                 {isLoading ? (
@@ -367,60 +270,6 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
-
-        {result && (
-          <div className="space-y-8 max-w-4xl mx-auto">
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Generated API Endpoint</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(`${window.location.origin}${result.apiUrl}`)}
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy URL
-                  </Button>
-                </div>
-
-                <code className="block bg-muted p-4 rounded-lg text-sm break-all">
-                  {window.location.origin}{result.apiUrl}
-                </code>
-
-                <div className="space-y-4">
-                  <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-                    <pre className="text-sm whitespace-pre">
-                      {JSON.stringify(result.jsonData, null, 2)}
-                    </pre>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
-                      value={enhancePrompt}
-                      onChange={(e) => setEnhancePrompt(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={handleEnhanceSubmit}
-                      disabled={!enhancePrompt || isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Wand2 className="h-4 w-4 mr-2" />
-                      )}
-                      Enhance
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <ApiTester />
-          </div>
-        )}
       </div>
     </div>
   );

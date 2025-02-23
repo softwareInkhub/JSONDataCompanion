@@ -3,22 +3,17 @@ import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Wand2, Check } from "lucide-react";
-import { useToast } from "@/hooks/use-toast"; // Fixed import path
+import { useToast } from "@/hooks/use-toast";
+import { Copy, Code2, Wand2, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function Preview() {
   const [location] = useLocation();
   const [data, setData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("pretty");
-  const [generatedSchema, setGeneratedSchema] = useState(null);
+  const [enhancePrompt, setEnhancePrompt] = useState("");
+  const [showRequestDetails, setShowRequestDetails] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -31,18 +26,22 @@ export default function Preview() {
     }
   }, [location]);
 
-  const generateSchema = async () => {
+  const handleEnhance = async () => {
     try {
-      const response = await fetch("/api/generate-schema", {
+      const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: data })
+        body: JSON.stringify({
+          prompt: enhancePrompt,
+          context: JSON.stringify(data)
+        })
       });
-      const schema = await response.json();
-      setGeneratedSchema(schema);
+      const result = await response.json();
+      setData(result);
+      setEnhancePrompt("");
       toast({
         title: "Success",
-        description: "Schema generated successfully",
+        description: "Data enhanced successfully",
       });
     } catch (error: any) {
       toast({
@@ -57,113 +56,126 @@ export default function Preview() {
 
   return (
     <div className="min-h-screen bg-background p-6">
+      {/* Floating Request Details Button */}
+      <Sheet open={showRequestDetails} onOpenChange={setShowRequestDetails}>
+        <SheetTrigger asChild>
+          <Button
+            className="fixed top-4 right-4 z-50"
+            size="lg"
+            variant="outline"
+          >
+            <Code2 className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="w-[400px] sm:w-[540px]">
+          <SheetHeader>
+            <SheetTitle>Request Details</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Request</h3>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
+                {`curl --request GET \\
+  --url '${window.location.origin}${data.apiUrl}'`}
+              </pre>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(`curl --request GET --url '${window.location.origin}${data.apiUrl}'`);
+                  toast({
+                    title: "Copied",
+                    description: "Request copied to clipboard",
+                  });
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Request
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Response</h3>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
+                {JSON.stringify(data.jsonData, null, 2)}
+              </pre>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(data.jsonData, null, 2));
+                  toast({
+                    title: "Copied",
+                    description: "Response copied to clipboard",
+                  });
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Response
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-6xl mx-auto"
       >
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Response Preview</h1>
+          <h1 className="text-3xl font-bold">Preview & Enhance</h1>
           <Button variant="outline" onClick={() => window.history.back()}>
-            Back to Testing
+            Back to Home
           </Button>
         </div>
 
         <Card className="p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="pretty">Pretty</TabsTrigger>
-              <TabsTrigger value="raw">Raw</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="pretty">
-              <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-[600px]">
-                <code className="text-sm">
-                  {JSON.stringify(data, null, 2)}
-                </code>
+          <div className="space-y-6">
+            <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+              <pre className="text-sm whitespace-pre">
+                {JSON.stringify(data.jsonData, null, 2)}
               </pre>
-            </TabsContent>
+            </div>
 
-            <TabsContent value="raw">
-              <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-[600px]">
-                <code className="text-sm">
-                  {JSON.stringify(data)}
-                </code>
-              </pre>
-            </TabsContent>
-          </Tabs>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
+                value={enhancePrompt}
+                onChange={(e) => setEnhancePrompt(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                onClick={handleEnhance}
+                disabled={!enhancePrompt}
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                Enhance with AI
+              </Button>
+            </div>
+          </div>
         </Card>
 
         <div className="mt-6 flex gap-4">
           <Button
             variant="outline"
             onClick={() => {
-              navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+              navigator.clipboard.writeText(JSON.stringify(data.jsonData, null, 2));
               toast({
                 title: "Copied",
                 description: "JSON data copied to clipboard",
               });
             }}
           >
+            <Copy className="h-4 w-4 mr-2" />
             Copy to Clipboard
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: "application/json",
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "data.json";
-              a.click();
-              URL.revokeObjectURL(url);
-              toast({
-                title: "Downloaded",
-                description: "JSON file downloaded successfully",
-              });
-            }}
-          >
-            Download JSON
-          </Button>
-          <Button variant="outline">Share</Button>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button onClick={generateSchema} className="gap-2">
-                <Wand2 className="h-4 w-4" />
-                Generate Schema
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[540px]">
-              <SheetHeader>
-                <SheetTitle>Generated Schema</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4">
-                {generatedSchema && (
-                  <div className="space-y-4">
-                    <div className="bg-muted rounded-lg p-4 overflow-auto max-h-[500px]">
-                      <pre className="text-sm">
-                        {JSON.stringify(generatedSchema, null, 2)}
-                      </pre>
-                    </div>
-                    <Button
-                      className="w-full gap-2"
-                      onClick={() => {
-                        toast({
-                          title: "Success",
-                          description: "Schema applied successfully",
-                        });
-                      }}
-                    >
-                      <Check className="h-4 w-4" />
-                      Apply Schema
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+          {/* Removed download and share buttons as they are now less relevant */}
+          {/* Removed generate schema section as it's less relevant to the new enhancement feature */}
+
         </div>
       </motion.div>
     </div>
