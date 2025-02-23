@@ -1,0 +1,138 @@
+Create a full-stack web application that allows users to create AI-generated API endpoints, validate JSON data, and manage schemas with full CRUD capabilities. The application should have the following features:
+
+---
+
+### **Frontend (React.js + Tailwind CSS)**:
+1. Build a responsive and modern UI with Tailwind CSS.
+   - A central input field where users can:
+     - Enter a text prompt (e.g., "top western movies with name, director, release_date").
+     - Upload files in formats like JSON or CSV.
+   - A "Generate" button to send the input to the backend and fetch generated JSON data.
+   - Display the generated JSON data in a preview panel.
+   - Include a "Make Desired Changes" button to allow users to edit the JSON data directly.
+
+2. Add a schema management section:
+   - Allow users to view, create, edit, and delete schemas.
+   - Provide a visual schema editor with drag-and-drop functionality.
+   - Show schema validation errors in real-time when editing JSON data.
+
+3. Add an API testing modal:
+   - Allow users to input REST API details (URL, method, headers, body).
+   - Fetch data from the provided API and display it in the preview panel.
+   - Enable saving fetched data as an endpoint with schema validation.
+
+4. Use React state management (e.g., Context API or Redux) for handling user inputs and responses.
+
+---
+
+### **Backend (Node.js + Express)**:
+1. Set up an Express.js server with the following routes:
+   - `POST /generate`: Accepts user prompts or uploaded files, uses OpenAI's GPT model to generate structured JSON data, and returns the result.
+   - `POST /validate`: Validates JSON data against a user-defined schema using `ajv`.
+   - `POST /test-api`: Accepts REST API details (URL, method, headers, body), fetches data from the external API using `axios`, and returns the response.
+   - `POST /create-schema`: Allows users to create schemas manually or via AI prompts.
+   - `GET /schemas`: Fetches all user-defined schemas from the database.
+   - `PUT /schemas/:id`: Updates an existing schema.
+   - `DELETE /schemas/:id`: Deletes a schema by ID.
+
+2. Integrate OpenAI for AI-powered features:
+   - Use OpenAI's GPT model for generating schemas from natural language prompts.
+   - Example Prompt: *"Create a schema for movies with fields: name (string), director (string), release_date (date)."*
+
+3. Use `ajv` for JSON Schema validation:
+   - Validate incoming JSON data against schemas before saving or processing it.
+
+4. Store schemas and generated data in a PostgreSQL database using Supabase.
+
+---
+
+### **Database (Supabase/PostgreSQL)**:
+1. Set up a Supabase project and configure tables:
+   - **Schemas Table**:
+     ```
+     CREATE TABLE schemas (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       name TEXT NOT NULL,
+       version INT DEFAULT 1,
+       schema JSONB NOT NULL,
+       created_at TIMESTAMP DEFAULT NOW()
+     );
+     ```
+   - **Endpoints Table**:
+     ```
+     CREATE TABLE endpoints (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       name TEXT NOT NULL,
+       json_data JSONB NOT NULL,
+       schema_id UUID REFERENCES schemas(id),
+       created_at TIMESTAMP DEFAULT NOW()
+     );
+     ```
+
+2. Use Supabase's JavaScript client library (`@supabase/supabase-js`) in the backend to interact with the database.
+
+---
+
+### **Features**:
+1. **AI-Powered Schema Management**:
+   - Allow users to create schemas using natural language prompts.
+   - Suggest improvements or optimizations for existing schemas using AI.
+
+2. **JSON Editing & Validation**:
+   - Enable inline editing of generated JSON data with real-time validation against selected schemas.
+
+3. **Dynamic API Generation**:
+   - Create RESTful APIs dynamically based on user-defined schemas.
+   - Provide interactive documentation for generated APIs using Swagger UI.
+
+4. **API Testing**:
+   - Allow users to test external APIs by entering URL, method, headers, and body in a modal.
+   - Display fetched responses in JSON format and allow saving them as new endpoints.
+
+5. **Version Control for Schemas**:
+   - Track changes made to schemas over time.
+   - Allow users to revert to previous versions if needed.
+
+6. **Security Features**:
+   - Secure all endpoints with API keys or OAuth2 authentication.
+   - Validate all inputs on both frontend and backend to prevent injection attacks.
+
+---
+
+### Example Workflow:
+1. User enters: *"top western movies with name, director, release_date."*
+2. Backend sends this prompt to OpenAI's GPT model via `/generate`.
+3. OpenAI generates JSON data like:
+    ```
+    [
+      { "name": "The Good, the Bad and the Ugly", "director": "Sergio Leone", "release_date": "1966" },
+      { "name": "High Noon", "director": "Fred Zinnemann", "release_date": "1952" }
+    ]
+    ```
+4. The frontend displays this data in a preview panel with options to edit or save it as an endpoint.
+5. User clicks "Make Desired Changes" to edit the JSON directly or modify its schema via the visual editor.
+6. The edited schema is validated against sample JSON data in real-time.
+7. User saves the endpoint, which creates a dynamic API URL like `/api/12345`.
+
+---
+
+### Deployment Instructions:
+1. Deploy the frontend using Vercel or Netlify.
+2. Deploy the backend using Vercel serverless functions or Render.
+3. Configure environment variables securely for OpenAI API keys and Supabase credentials.
+
+---
+
+### Tools & Technologies
+| Component                  | Suggested Tools/Technologies        |
+|----------------------------|--------------------------------------|
+| Frontend                   | React.js + Tailwind CSS             |
+| Backend                    | Node.js + Express.js                |
+| Database                   | Supabase/PostgreSQL                 |
+| AI Integration             | OpenAI GPT                          |
+| Validation                 | Ajv (JSON Schema validation)        |
+| Deployment                 | Vercel / Render                     |
+
+---
+
+This prompt ensures that Replit generates a comprehensive solution tailored to your requirements while adhering to best practices!

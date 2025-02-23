@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
-import { Loader2, Wand2, Upload, Globe } from "lucide-react";
+import { Loader2, Wand2, Upload, Globe, Code2 } from "lucide-react";
 
 const examplePrompts = [
   "rick and morty characters",
@@ -135,13 +135,23 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
       <div className="container mx-auto py-16 px-4">
-        <div className="space-y-8 text-center max-w-2xl mx-auto mb-12">
-          <h1 className="text-6xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            JSON Data AI
-          </h1>
-          <p className="text-xl text-muted-foreground">
-            Get JSON data about anything with a prompt. Turn it into an API endpoint. Start fetching.
-          </p>
+        <div className="flex justify-between items-center mb-8">
+          <div className="space-y-8 text-center max-w-2xl mx-auto">
+            <h1 className="text-6xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              JSON Data AI
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              Get JSON data about anything with a prompt. Turn it into an API endpoint. Start fetching.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/schemas")}
+            className="border-dashed hover:border-primary hover:bg-primary/10"
+          >
+            <Code2 className="h-4 w-4 mr-2" />
+            Manage Schemas
+          </Button>
         </div>
 
         <Card className="max-w-2xl mx-auto bg-black/5 backdrop-blur-sm border-0 shadow-lg">
