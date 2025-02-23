@@ -1,0 +1,128 @@
+Build a full-stack web application that replicates and enhances the functionality of JSON Data AI (https://www.jsondataai.com). The application should allow users to create AI-generated API endpoints by providing inputs in various formats (text, CSV, PDF, Excel, etc.). The system should dynamically generate JSON data from the input and create API endpoints for users to fetch the data. Below are the detailed requirements:
+
+---
+
+### **Frontend (React.js with Tailwind CSS)**:
+1. Create a responsive and user-friendly interface with:
+   - A central input field where users can:
+     - Enter a text prompt (e.g., "top western movies with name, director, release_date").
+     - Upload files in formats like CSV, Excel, or PDF.
+   - A submit button to process the input.
+   - Display of:
+     - The generated JSON response.
+     - The unique API endpoint URL (with a "copy to clipboard" button).
+   - Example prompts displayed as clickable chips below the input field for quick testing.
+
+2. Use **React.js** for frontend logic and **Tailwind CSS** for styling.
+
+3. Implement drag-and-drop functionality for file uploads.
+
+4. Provide real-time feedback or loading indicators while processing inputs.
+
+---
+
+### **Backend (Node.js with Express)**:
+1. Set up an Express.js server to handle API requests.
+
+2. Integrate OpenAI's GPT API:
+   - Use OpenAI's GPT model (e.g., GPT-4) to process text prompts and generate structured JSON data.
+   - Example: For the prompt "top western movies with name, director, release_date," generate JSON like:
+     ```
+     [
+       { "name": "The Good, the Bad and the Ugly", "director": "Sergio Leone", "release_date": "1966" },
+       { "name": "High Noon", "director": "Fred Zinnemann", "release_date": "1952" }
+     ]
+     ```
+
+3. Add support for parsing files:
+   - **CSV/Excel**: Use `papaparse` or `xlsx` libraries to parse data into JSON.
+   - **PDF**: Use `pdf-parse` or `pdf-lib` to extract text from PDFs.
+   - **Images/Scanned PDFs**: Use OCR tools like Tesseract to extract text.
+   - Automatically detect file type and convert it into structured JSON.
+
+4. Store generated JSON data in Supabase along with metadata like a unique ID, user-defined prompt, file name (if applicable), and timestamp.
+
+5. Create dynamic API endpoints:
+   - `POST /generate`: Accepts user input (prompt or file), processes it using OpenAI and/or parsing tools, stores the result in Supabase, and returns the unique API endpoint URL.
+   - `GET /api/:id`: Fetches and returns JSON data from Supabase based on the unique ID.
+
+6. Secure sensitive information like OpenAI API keys using environment variables.
+
+---
+
+### **Supabase Integration**:
+1. Set up a Supabase project with a PostgreSQL database.
+
+2. Create a table named `endpoints` with the following schema:
+   - `id`: UUID (primary key).
+   - `prompt`: Text (user's input prompt).
+   - `file_name`: Text (optional; name of uploaded file).
+   - `json_data`: JSONB (the generated JSON data).
+   - `created_at`: Timestamp (auto-generated).
+
+3. Use Supabase's JavaScript client library (`@supabase/supabase-js`) in the backend to interact with the database.
+
+---
+
+### **Features**:
+1. Multi-format Input Support:
+   - Accept inputs as text prompts or files in formats like CSV, Excel, PDF, or images.
+   - Automatically parse and structure input data into JSON.
+
+2. Dynamic API Creation:
+   - Generate unique API endpoints for each user request.
+   - Allow users to fetch their generated data via these endpoints.
+
+3. Customization Options:
+   - Allow users to specify additional parameters like filtering or sorting when creating endpoints.
+
+4. Interactive Documentation:
+   - Auto-generate Swagger UI documentation for all created endpoints.
+
+5. Optimization:
+   - Implement caching for frequently accessed endpoints using Redis.
+   - Compress responses using gzip for faster delivery.
+
+6. Security Features:
+   - Secure endpoints with API keys or tokens.
+   - Rate limiting to prevent abuse of dynamically created APIs.
+
+7. Scalability:
+   - Deploy on a scalable platform like Vercel or AWS Lambda for serverless architecture.
+   - Optimize database queries using indexing on frequently queried fields.
+
+---
+
+### Example Workflow:
+1. User enters: "top western movies with name, director, release_date."
+2. Backend sends this prompt to OpenAI's GPT API.
+3. OpenAI generates JSON data like:
+    ```
+    [
+      { "name": "The Good, the Bad and the Ugly", "director": "Sergio Leone", "release_date": "1966" },
+      { "name": "High Noon", "director": "Fred Zinnemann", "release_date": "1952" }
+    ]
+    ```
+4. If a file is uploaded (e.g., CSV), backend parses it into structured JSON instead of using OpenAI.
+5. The backend stores this data in Supabase under a unique ID (e.g., `12345`).
+6. The frontend displays:
+    - The generated JSON response.
+    - The dynamic API endpoint URL: `/api/12345`.
+
+7. Users can fetch this data by making GET requests to `/api/12345`.
+
+---
+
+### Deployment Instructions:
+1. Deploy the backend using Vercel or Render.
+2. Deploy the frontend using Vercel or Netlify.
+3. Configure environment variables securely in deployment platforms for OpenAI API keys and Supabase credentials.
+
+---
+
+### Additional Features (Optional):
+1. Add real-time collaboration where multiple users can work on creating APIs together.
+2. Provide analytics dashboards showing usage statistics for each endpoint.
+3. Allow users to edit their generated APIs by updating stored JSON data in Supabase.
+
+Use modern best practices for security, scalability, and performance optimization while implementing this project.
