@@ -167,21 +167,19 @@ export default function Home() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="flex items-center justify-center gap-6 mx-auto max-w-2xl overflow-x-auto py-4 no-scrollbar">
               {examplePrompts.map((example) => (
-                <Button
+                <button
                   key={example}
-                  variant="ghost"
-                  size="sm"
                   onClick={() => setPrompt(example)}
-                  className="text-sm text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  className="text-sm whitespace-nowrap text-muted-foreground hover:text-primary hover:underline transition-colors"
                 >
                   {example}
-                </Button>
+                </button>
               ))}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center justify-center mt-4">
               <div {...getRootProps()} className="flex-1">
                 <Input {...getInputProps()} />
                 <Button
@@ -190,7 +188,7 @@ export default function Home() {
                   disabled={isLoading}
                 >
                   <Upload className="h-4 w-4 mr-2" />
-                  {isDragActive ? "Drop file here" : "Upload CSV/Excel/JSON/XML/HTML/TXT"}
+                  Upload CSV/Excel/JSON/XML/HTML/TXT
                 </Button>
               </div>
 
