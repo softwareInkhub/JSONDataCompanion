@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Code2, Wand2, Edit2, Table, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import MonacoEditor from '@monaco-editor/react';
-import { DataGrid } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 
 function flattenObject(obj: any, prefix = ''): any {
@@ -27,41 +26,46 @@ function flattenObject(obj: any, prefix = ''): any {
 }
 
 function transformToTableData(data: any): { rows: any[], columns: any[] } {
-  // Convert non-array data into array format
-  const arrayData = Array.isArray(data) ? data : [data];
+  try {
+    // Ensure data is an array
+    const arrayData = Array.isArray(data) ? data : [data];
 
-  // Handle empty data
-  if (!arrayData.length) {
+    if (!arrayData.length) {
+      return { rows: [], columns: [] };
+    }
+
+    // Flatten nested objects
+    const flattenedData = arrayData.map(item => flattenObject(item));
+
+    // Get all unique keys for columns
+    const allKeys = new Set<string>();
+    flattenedData.forEach(item => {
+      Object.keys(item).forEach(key => allKeys.add(key));
+    });
+
+    // Create columns with proper configuration
+    const columns = Array.from(allKeys).map(key => ({
+      key,
+      name: key,
+      resizable: true,
+      sortable: true,
+      width: Math.max(100, key.length * 10),
+      formatter(props: any) {
+        const value = props.row[key];
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+      }
+    }));
+
+    return {
+      rows: flattenedData,
+      columns
+    };
+  } catch (error) {
+    console.error('Error transforming data:', error);
     return { rows: [], columns: [] };
   }
-
-  // Flatten nested objects
-  const flattenedData = arrayData.map(item => flattenObject(item));
-
-  // Get all unique keys for columns
-  const allKeys = new Set<string>();
-  flattenedData.forEach(item => {
-    Object.keys(item).forEach(key => allKeys.add(key));
-  });
-
-  const columns = Array.from(allKeys).map(key => ({
-    key,
-    name: key,
-    resizable: true,
-    sortable: true,
-    width: Math.max(100, key.length * 10),
-    formatter: ({ row }: any) => {
-      const value = row[key];
-      if (value === null || value === undefined) return '';
-      if (typeof value === 'object') return JSON.stringify(value);
-      return String(value);
-    }
-  }));
-
-  return {
-    rows: flattenedData,
-    columns
-  };
 }
 
 export default function Preview() {
@@ -75,7 +79,6 @@ export default function Preview() {
 
   const tableData = useMemo(() => {
     if (!data) return { rows: [], columns: [] };
-    // Use data directly instead of looking for jsonData property
     return transformToTableData(data);
   }, [data]);
 
@@ -85,7 +88,6 @@ export default function Preview() {
       fetch(`/api/${id}`)
         .then(res => res.json())
         .then(data => {
-          console.log("Fetched data:", data); // Debug log
           setData(data);
           setEditableJson(JSON.stringify(data, null, 2));
         })
@@ -138,7 +140,6 @@ export default function Preview() {
         description: "JSON updated successfully",
       });
     } catch (error) {
-      // Don't update data if JSON is invalid
       console.error("Invalid JSON:", error);
     }
   };
@@ -151,7 +152,6 @@ export default function Preview() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted p-6">
-      {/* Floating Request Details Button */}
       <Sheet open={showRequestDetails} onOpenChange={setShowRequestDetails}>
         <SheetTrigger asChild>
           <Button
@@ -162,7 +162,7 @@ export default function Preview() {
             <Code2 className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetContent>
           <SheetHeader>
             <SheetTitle>Request Details</SheetTitle>
           </SheetHeader>
@@ -278,20 +278,19 @@ export default function Preview() {
 
               <TabsContent value="table" className="mt-0">
                 <div className="bg-background rounded-lg p-4 max-h-[400px] overflow-auto border">
-                  <DataGrid
-                    className="rdg-light border-none"
-                    columns={tableData.columns}
-                    rows={tableData.rows}
-                    defaultColumnOptions={{
-                      resizable: true,
-                      sortable: true
-                    }}
-                    style={{ 
-                      height: 350,
-                      border: 'none',
-                      backgroundColor: 'transparent'
-                    }}
-                  />
+                  {tableData.rows.length > 0 ? (
+                    <div style={{ height: 350 }}>
+                      <DataGrid
+                        rows={tableData.rows}
+                        columns={tableData.columns}
+                        className="rdg-light"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No data available in table format
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
