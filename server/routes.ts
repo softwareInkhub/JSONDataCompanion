@@ -283,37 +283,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { data } = req.body;
 
-    // Use OpenAI to analyze and generate schema
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
-        },
-        {
-          role: "user",
-          content: generateSchemaPrompt(data)
-        }
-      ],
-      response_format: { type: "json_object" }
-    });
+      if (!data) {
+        return res.status(400).json({ error: "No data provided" });
+      }
 
-    let schema = JSON.parse(completion.choices[0].message.content || "{}");
+      // Use OpenAI to analyze and generate schema
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
+          },
+          {
+            role: "user",
+            content: generateSchemaPrompt(data)
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
 
-    // Validate the generated schema
-    try {
-      const zodSchema = z.object(schema.schema.properties);
-      zodSchema.parse(data); // Test the schema against the original data
-    } catch (validationError: any) {
-      console.warn("Generated schema validation failed:", validationError);
-      // Automatically adjust the schema based on validation errors
-      schema.schema = await regenerateSchemaFromValidationError(data, validationError);
-    }
+      let schema = JSON.parse(completion.choices[0].message.content || "{}");
+
+      if (!schema.schema || !schema.schema.properties) {
+        throw new Error("Invalid schema generated");
+      }
+
+      // Validate the generated schema
+      try {
+        const zodSchema = z.object(schema.schema.properties);
+        zodSchema.parse(data); // Test the schema against the original data
+      } catch (validationError: any) {
+        console.warn("Generated schema validation failed:", validationError);
+        // Automatically adjust the schema based on validation errors
+        schema.schema = await regenerateSchemaFromValidationError(data, validationError);
+      }
 
       res.json(schema);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Schema generation error:", error);
+      res.status(500).json({ 
+        error: error.message,
+        details: error.stack
+      });
     }
   });
 

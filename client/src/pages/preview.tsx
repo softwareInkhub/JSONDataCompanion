@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -6,15 +6,14 @@ import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Code2, Wand2, Edit2, Table, Eye, Save } from "lucide-react";
+import { Copy, Code2, Wand2, Edit2, Table, Eye, Save, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import MonacoEditor from '@monaco-editor/react';
 import { DataGrid } from 'react-data-grid';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SchemaEditor } from "@/components/ui/schema-editor";
 import 'react-data-grid/lib/styles.css';
-import { QueryClient } from '@tanstack/react-query'; //Import needed for queryClient
-
+import { useQueryClient } from '@tanstack/react-query';
 
 function flattenObject(obj: any, prefix = ''): any {
   if (!obj || typeof obj !== 'object') return { [prefix]: obj };
@@ -32,23 +31,19 @@ function flattenObject(obj: any, prefix = ''): any {
 
 function transformToTableData(data: any): { rows: any[], columns: any[] } {
   try {
-    // Ensure data is an array
     const arrayData = Array.isArray(data) ? data : [data];
 
     if (!arrayData.length) {
       return { rows: [], columns: [] };
     }
 
-    // Flatten nested objects
     const flattenedData = arrayData.map(item => flattenObject(item));
 
-    // Get all unique keys for columns
     const allKeys = new Set<string>();
     flattenedData.forEach(item => {
       Object.keys(item).forEach(key => allKeys.add(key));
     });
 
-    // Create columns with proper configuration
     const columns = Array.from(allKeys).map(key => ({
       key,
       name: key,
@@ -82,8 +77,9 @@ export default function Preview() {
   const [editableJson, setEditableJson] = useState("");
   const [showSchemaDialog, setShowSchemaDialog] = useState(false);
   const [generatedSchema, setGeneratedSchema] = useState<any>(null);
+  const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
   const { toast } = useToast();
-  const queryClient = new QueryClient(); // Initialize queryClient
+  const queryClient = useQueryClient();
 
   const tableData = useMemo(() => {
     if (!data) return { rows: [], columns: [] };
@@ -154,6 +150,7 @@ export default function Preview() {
 
   const handleGenerateSchema = async () => {
     try {
+      setIsGeneratingSchema(true);
       const response = await fetch("/api/generate-schema", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -161,7 +158,8 @@ export default function Preview() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to generate schema");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate schema");
       }
 
       const schema = await response.json();
@@ -178,6 +176,8 @@ export default function Preview() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsGeneratingSchema(false);
     }
   };
 
@@ -189,11 +189,13 @@ export default function Preview() {
         body: JSON.stringify({
           ...schema,
           name: schema.name || `Schema for ${location.split("/").pop()}`,
+          id: undefined 
         })
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save schema");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save schema");
       }
 
       setShowSchemaDialog(false);
@@ -290,9 +292,22 @@ export default function Preview() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Preview & Enhance</h1>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleGenerateSchema}>
-              <Save className="h-4 w-4 mr-2" />
-              Create Schema
+            <Button 
+              variant="outline" 
+              onClick={handleGenerateSchema}
+              disabled={isGeneratingSchema}
+            >
+              {isGeneratingSchema ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Create Schema
+                </>
+              )}
             </Button>
             <Button variant="outline" onClick={() => window.history.back()}>
               Back to Home
