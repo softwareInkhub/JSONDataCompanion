@@ -12,14 +12,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Wand2, Check } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-
+import { useToast } from "@/hooks/use-toast"; // Fixed import path
 
 export default function Preview() {
   const [location] = useLocation();
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("pretty");
   const [generatedSchema, setGeneratedSchema] = useState(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const id = location.split("/").pop();
@@ -36,7 +36,7 @@ export default function Preview() {
       const response = await fetch("/api/generate-schema", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: data }) // Use the existing 'data' state
+        body: JSON.stringify({ data: data })
       });
       const schema = await response.json();
       setGeneratedSchema(schema);
@@ -95,8 +95,38 @@ export default function Preview() {
         </Card>
 
         <div className="mt-6 flex gap-4">
-          <Button variant="outline">Copy to Clipboard</Button>
-          <Button variant="outline">Download JSON</Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+              toast({
+                title: "Copied",
+                description: "JSON data copied to clipboard",
+              });
+            }}
+          >
+            Copy to Clipboard
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: "application/json",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "data.json";
+              a.click();
+              URL.revokeObjectURL(url);
+              toast({
+                title: "Downloaded",
+                description: "JSON file downloaded successfully",
+              });
+            }}
+          >
+            Download JSON
+          </Button>
           <Button variant="outline">Share</Button>
           <Sheet>
             <SheetTrigger asChild>
@@ -120,7 +150,6 @@ export default function Preview() {
                     <Button
                       className="w-full gap-2"
                       onClick={() => {
-                        // Placeholder for applying the schema
                         toast({
                           title: "Success",
                           description: "Schema applied successfully",

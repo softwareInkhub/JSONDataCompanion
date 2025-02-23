@@ -11,7 +11,6 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import * as xml2js from "xml2js";
 import * as cheerio from "cheerio";
-import fetch from "node-fetch";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -385,26 +384,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add /api/test-api endpoint after other routes
+  // Add /api/test-api endpoint
   app.post("/api/test-api", async (req, res) => {
     try {
-      const { url, method, headers, body } = req.body;
+      const { url, method = 'GET', headers = {}, body } = req.body;
 
       if (!url) {
         return res.status(400).json({ error: "URL is required" });
       }
 
-      const response = await fetch(url, {
-        method: method || 'GET',
-        headers: headers || {},
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      // Validate and prepare fetch options
+      const fetchOptions: RequestInit = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        }
+      };
+
+      if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
       }
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Handle non-JSON responses
+        const text = await response.text();
+        data = { content: text };
+      }
 
       // Create a new endpoint with the fetched data
       const endpoint = await storage.createEndpoint({
@@ -412,13 +428,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jsonData: data,
         fileName: null,
         filterOptions: null,
-        sortOptions: null
+        sortOptions: null,
+        sourceApiUrl: url // Store the source API URL
       });
 
       res.json({ 
         id: endpoint.id,
         jsonData: data,
-        apiUrl: `/api/${endpoint.id}`
+        apiUrl: `/api/${endpoint.id}`,
+        sourceApiUrl: url
       });
 
     } catch (error: any) {
