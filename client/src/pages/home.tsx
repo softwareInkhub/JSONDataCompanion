@@ -64,7 +64,6 @@ const ApiTester = () => {
 
 import { useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
