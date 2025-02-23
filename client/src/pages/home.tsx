@@ -133,30 +133,31 @@ export default function Home() {
   const isLoading = promptMutation.isPending || fileMutation.isPending || apiMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4 space-y-8">
-        <div className="space-y-4 text-center max-w-3xl mx-auto">
-          <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-black text-white">
+      <div className="container mx-auto py-16 px-4">
+        <div className="space-y-8 text-center max-w-2xl mx-auto mb-12">
+          <h1 className="text-6xl font-bold tracking-tight">
             JSON Data AI
           </h1>
-          <p className="text-xl text-muted-foreground">
-            Get JSON data about anything with a prompt. Turn it into an API endpoint. Start fetching.
+          <p className="text-xl text-gray-400">
+            Transform your ideas into structured data with AI
           </p>
         </div>
 
-        <Card className="max-w-3xl mx-auto bg-background/80">
+        <Card className="max-w-2xl mx-auto border-gray-800 bg-black">
           <CardContent className="pt-6 space-y-6">
             <div className="relative">
               <Textarea
                 placeholder="Enter your prompt (e.g., 'top western movies with name, director, release_date')"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="min-h-[100px] pr-24"
+                className="min-h-[120px] bg-gray-900 border-gray-800 text-white"
               />
               <Button
                 className="absolute right-2 top-2"
                 onClick={() => promptMutation.mutate(prompt)}
                 disabled={!prompt || isLoading}
+                variant="outline"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -174,7 +175,7 @@ export default function Home() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPrompt(example)}
-                  className="text-sm"
+                  className="text-sm border-gray-800 hover:bg-gray-900"
                 >
                   {example}
                 </Button>
@@ -186,7 +187,7 @@ export default function Home() {
                 <Input {...getInputProps()} />
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-gray-800 hover:bg-gray-900"
                   disabled={isLoading}
                 >
                   <Upload className="h-4 w-4 mr-2" />
@@ -196,35 +197,36 @@ export default function Home() {
 
               <Dialog open={showApiDialog} onOpenChange={setShowApiDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1 border-gray-800 hover:bg-gray-900">
                     <Globe className="h-4 w-4 mr-2" />
                     Test REST API
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="bg-black border-gray-800">
                   <DialogHeader>
                     <DialogTitle>Test REST API</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="text-gray-400">
                       Enter the API details to fetch and transform the data.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <label htmlFor="url">API URL</label>
+                      <label htmlFor="url" className="text-gray-400">API URL</label>
                       <Input
                         id="url"
                         value={apiUrl}
                         onChange={(e) => setApiUrl(e.target.value)}
                         placeholder="https://api.example.com/data"
+                        className="bg-gray-900 border-gray-800"
                       />
                     </div>
                     <div className="grid gap-2">
-                      <label htmlFor="method">Method</label>
+                      <label htmlFor="method" className="text-gray-400">Method</label>
                       <Select value={apiMethod} onValueChange={setApiMethod}>
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-gray-900 border-gray-800">
                           <SelectValue placeholder="Select method" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-black border-gray-800">
                           {httpMethods.map((method) => (
                             <SelectItem key={method} value={method}>
                               {method}
@@ -234,26 +236,28 @@ export default function Home() {
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <label htmlFor="headers">Headers (JSON)</label>
+                      <label htmlFor="headers" className="text-gray-400">Headers (JSON)</label>
                       <Textarea
                         id="headers"
                         value={apiHeaders}
                         onChange={(e) => setApiHeaders(e.target.value)}
                         placeholder='{"Authorization": "Bearer token"}'
+                        className="bg-gray-900 border-gray-800"
                       />
                     </div>
                     <div className="grid gap-2">
-                      <label htmlFor="body">Body (JSON)</label>
+                      <label htmlFor="body" className="text-gray-400">Body (JSON)</label>
                       <Textarea
                         id="body"
                         value={apiBody}
                         onChange={(e) => setApiBody(e.target.value)}
                         placeholder='{"key": "value"}'
+                        className="bg-gray-900 border-gray-800"
                       />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button onClick={() => apiMutation.mutate()} disabled={!apiUrl || isLoading}>
+                    <Button onClick={() => apiMutation.mutate()} disabled={!apiUrl || isLoading} variant="outline" className="border-gray-800">
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : (

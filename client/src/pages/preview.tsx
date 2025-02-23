@@ -4,9 +4,8 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Code2, Wand2, Check } from "lucide-react";
+import { Copy, Code2, Wand2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 export default function Preview() {
@@ -52,10 +51,14 @@ export default function Preview() {
     }
   };
 
-  if (!data) return <div>Loading...</div>;
+  if (!data) return (
+    <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="text-xl">Loading...</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-black text-white p-6">
       {/* Floating Request Details Button */}
       <Sheet open={showRequestDetails} onOpenChange={setShowRequestDetails}>
         <SheetTrigger asChild>
@@ -67,21 +70,21 @@ export default function Preview() {
             <Code2 className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetContent className="w-[400px] sm:w-[540px] bg-black border-gray-800">
           <SheetHeader>
-            <SheetTitle>Request Details</SheetTitle>
+            <SheetTitle className="text-white">Request Details</SheetTitle>
           </SheetHeader>
           <div className="mt-6 space-y-6">
             <div className="space-y-2">
-              <h3 className="text-sm font-medium">Request</h3>
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
+              <h3 className="text-sm font-medium text-gray-400">Request</h3>
+              <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-auto text-white">
                 {`curl --request GET \\
   --url '${window.location.origin}${data.apiUrl}'`}
               </pre>
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-2"
+                className="mt-2 border-gray-800"
                 onClick={() => {
                   navigator.clipboard.writeText(`curl --request GET --url '${window.location.origin}${data.apiUrl}'`);
                   toast({
@@ -96,14 +99,14 @@ export default function Preview() {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-sm font-medium">Response</h3>
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
+              <h3 className="text-sm font-medium text-gray-400">Response</h3>
+              <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-auto text-white">
                 {JSON.stringify(data.jsonData, null, 2)}
               </pre>
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-2"
+                className="mt-2 border-gray-800"
                 onClick={() => {
                   navigator.clipboard.writeText(JSON.stringify(data.jsonData, null, 2));
                   toast({
@@ -127,15 +130,15 @@ export default function Preview() {
       >
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Preview & Enhance</h1>
-          <Button variant="outline" onClick={() => window.history.back()}>
+          <Button variant="outline" onClick={() => window.history.back()} className="border-gray-800">
             Back to Home
           </Button>
         </div>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-black border-gray-800">
           <div className="space-y-6">
-            <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-              <pre className="text-sm whitespace-pre">
+            <div className="bg-gray-900 rounded-lg p-4 max-h-[400px] overflow-auto">
+              <pre className="text-sm whitespace-pre text-white">
                 {JSON.stringify(data.jsonData, null, 2)}
               </pre>
             </div>
@@ -145,12 +148,13 @@ export default function Preview() {
                 placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
                 value={enhancePrompt}
                 onChange={(e) => setEnhancePrompt(e.target.value)}
-                className="flex-1"
+                className="flex-1 bg-gray-900 border-gray-800"
               />
               <Button
                 variant="outline"
                 onClick={handleEnhance}
                 disabled={!enhancePrompt}
+                className="border-gray-800"
               >
                 <Wand2 className="h-4 w-4 mr-2" />
                 Enhance with AI
@@ -159,7 +163,7 @@ export default function Preview() {
           </div>
         </Card>
 
-        <div className="mt-6 flex gap-4">
+        <div className="mt-6">
           <Button
             variant="outline"
             onClick={() => {
@@ -169,13 +173,11 @@ export default function Preview() {
                 description: "JSON data copied to clipboard",
               });
             }}
+            className="border-gray-800"
           >
             <Copy className="h-4 w-4 mr-2" />
             Copy to Clipboard
           </Button>
-          {/* Removed download and share buttons as they are now less relevant */}
-          {/* Removed generate schema section as it's less relevant to the new enhancement feature */}
-
         </div>
       </motion.div>
     </div>
