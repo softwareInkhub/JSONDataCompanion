@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
-import { useLocation } from "wouter"; // Fixed import
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
 import { Loader2, Wand2, Upload, Globe } from "lucide-react";
-import Scene3D from "@/components/Scene3D";
 
 const examplePrompts = [
   "rick and morty characters",
@@ -23,7 +22,7 @@ const examplePrompts = [
 const httpMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
 
 export default function Home() {
-  const [, setLocation] = useLocation(); // Fixed navigation
+  const [, setLocation] = useLocation();
   const [prompt, setPrompt] = useState("");
   const [showApiDialog, setShowApiDialog] = useState(false);
   const [apiUrl, setApiUrl] = useState("");
@@ -134,10 +133,8 @@ export default function Home() {
   const isLoading = promptMutation.isPending || fileMutation.isPending || apiMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <Scene3D />
-
-      <div className="container mx-auto py-8 px-4 space-y-8 relative">
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8 px-4 space-y-8">
         <div className="space-y-4 text-center max-w-3xl mx-auto">
           <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             JSON Data AI
@@ -147,7 +144,7 @@ export default function Home() {
           </p>
         </div>
 
-        <Card className="max-w-3xl mx-auto backdrop-blur-sm bg-background/80">
+        <Card className="max-w-3xl mx-auto bg-background/80">
           <CardContent className="pt-6 space-y-6">
             <div className="relative">
               <Textarea
