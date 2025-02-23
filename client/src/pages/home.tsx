@@ -63,8 +63,8 @@ export default function Home() {
   const promptMutation = useMutation({
     mutationFn: async (input: { prompt: string; context?: string }) => {
       const options: { prompt: string; filterOptions?: FilterOption; sortOptions?: SortOption } = {
-        prompt: input.context ? 
-          `Context: ${input.context}\nNew request: ${input.prompt}` : 
+        prompt: input.context ?
+          `Context: ${input.context}\nNew request: ${input.prompt}` :
           input.prompt
       };
 
@@ -275,6 +275,26 @@ export default function Home() {
                         {JSON.stringify(result.jsonData, null, 2)}
                       </pre>
                     </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
+                        value={enhancePrompt}
+                        onChange={(e) => setEnhancePrompt(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={handleEnhanceSubmit}
+                        disabled={!enhancePrompt || isLoading}
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Wand2 className="h-4 w-4 mr-2" />
+                        )}
+                        Enhance
+                      </Button>
+                    </div>
                   </TabsContent>
 
                   <TabsContent value="edit" className="space-y-4">
@@ -288,20 +308,20 @@ export default function Home() {
                             disabled={isLoading}
                           >
                             <Wand2 className="h-4 w-4 mr-2" />
-                            Enhance with AI
+                            Advanced Enhance
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Enhance with AI</DialogTitle>
+                            <DialogTitle>Advanced AI Enhancement</DialogTitle>
                             <DialogDescription>
-                              Describe how you want to enhance the data. Your request will be processed in the context of your original prompt.
+                              Describe complex changes or transformations you want to apply to the data.
                             </DialogDescription>
                           </DialogHeader>
                           <Textarea
                             value={enhancePrompt}
                             onChange={(e) => setEnhancePrompt(e.target.value)}
-                            placeholder="E.g., Add more details to each item, Sort by release date, etc."
+                            placeholder="E.g., 'Add detailed plot summaries for each movie', 'Include box office earnings and awards'"
                             className="min-h-[100px]"
                           />
                           <DialogFooter>
@@ -314,7 +334,7 @@ export default function Home() {
                               ) : (
                                 <Wand2 className="h-4 w-4 mr-2" />
                               )}
-                              Enhance
+                              Apply Changes
                             </Button>
                           </DialogFooter>
                         </DialogContent>
@@ -337,6 +357,7 @@ export default function Home() {
                       />
                     </div>
                   </TabsContent>
+
                 </Tabs>
               </CardContent>
             </Card>
