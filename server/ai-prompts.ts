@@ -1,5 +1,5 @@
 export function generateSchemaPrompt(data: any) {
-  return `Analyze this JSON data and create a comprehensive Zod validation schema:
+  return `Analyze this JSON data and create a comprehensive JSON schema with validations:
 
 ${JSON.stringify(data, null, 2)}
 
@@ -21,7 +21,7 @@ Requirements:
    - Maintain proper type hierarchy
 8. Consider adding enum validations for fields with limited value sets
 
-Return the schema in this format:
+Return a JSON object in this format:
 {
   "schema": {
     "type": "object",
@@ -30,7 +30,6 @@ Return the schema in this format:
         "type": "string|number|boolean|array|object",
         "description": "Clear description of the field purpose",
         "required": true|false,
-        // Additional validation rules based on type
         "minLength": number,
         "maxLength": number,
         "pattern": "regex pattern",

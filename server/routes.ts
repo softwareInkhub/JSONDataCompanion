@@ -212,18 +212,19 @@ async function validateJsonWithSchema(jsonData: unknown, schema: Schema): Promis
 }
 
 async function regenerateSchemaFromValidationError(data: any, error: any): Promise<any> {
-  const errorPrompt = `The following schema validation failed for this data:
+  const errorPrompt = `The following JSON schema validation failed for this data:
 Data: ${JSON.stringify(data)}
 Error: ${error.message}
 
-Please generate a corrected schema that properly validates this data structure.`;
+Please generate a corrected JSON schema that properly validates this data structure.
+Return the schema as a JSON object.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
         role: "system",
-        content: "You are a schema correction expert. Fix the schema to properly validate the given data."
+        content: "You are a schema correction expert. Fix the schema to properly validate the given data. Return the response as a JSON object."
       },
       {
         role: "user",
@@ -233,7 +234,8 @@ Please generate a corrected schema that properly validates this data structure.`
     response_format: { type: "json_object" }
   });
 
-  return JSON.parse(completion.choices[0].message.content || "{}").schema;
+  const result = JSON.parse(completion.choices[0].message.content || "{}");
+  return result.schema;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -287,13 +289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No data provided" });
       }
 
-      // Use OpenAI to analyze and generate schema
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
+            content: "You are a schema generator that creates JSON validation schemas based on data structure analysis. Return the response as a JSON object."
           },
           {
             role: "user",
