@@ -4,15 +4,19 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Code2, Wand2 } from "lucide-react";
+import { Copy, Code2, Wand2, Edit2, Table, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import MonacoEditor from '@monaco-editor/react';
 
 export default function Preview() {
   const [location] = useLocation();
   const [data, setData] = useState<any>(null);
   const [enhancePrompt, setEnhancePrompt] = useState("");
   const [showRequestDetails, setShowRequestDetails] = useState(false);
+  const [viewMode, setViewMode] = useState<'pretty' | 'raw' | 'table' | 'edit'>('pretty');
+  const [editableJson, setEditableJson] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -21,8 +25,8 @@ export default function Preview() {
       fetch(`/api/${id}`)
         .then(res => res.json())
         .then(data => {
-          console.log("Fetched data:", data); // Debug log
           setData(data);
+          setEditableJson(JSON.stringify(data, null, 2));
         })
         .catch(error => {
           console.error("Error fetching data:", error);
@@ -47,6 +51,7 @@ export default function Preview() {
       });
       const result = await response.json();
       setData(result);
+      setEditableJson(JSON.stringify(result, null, 2));
       setEnhancePrompt("");
       toast({
         title: "Success",
@@ -59,6 +64,52 @@ export default function Preview() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleJsonEdit = (value: string | undefined) => {
+    if (!value) return;
+    setEditableJson(value);
+    try {
+      const parsed = JSON.parse(value);
+      setData(parsed);
+      toast({
+        title: "Success",
+        description: "JSON updated successfully",
+      });
+    } catch (error) {
+      // Don't update data if JSON is invalid
+      console.error("Invalid JSON:", error);
+    }
+  };
+
+  const renderTableView = (data: any) => {
+    if (!Array.isArray(data)) {
+      return <div className="text-muted-foreground">Table view is only available for array data</div>;
+    }
+
+    const columns = Object.keys(data[0] || {});
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-muted">
+              {columns.map((col) => (
+                <th key={col} className="p-2 text-left border">{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, i) => (
+              <tr key={i} className="hover:bg-muted/50">
+                {columns.map((col) => (
+                  <td key={col} className="p-2 border">{JSON.stringify(row[col])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   if (!data) return (
@@ -147,11 +198,67 @@ export default function Preview() {
 
         <Card className="p-6">
           <div className="space-y-6">
-            <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-              <pre className="text-sm whitespace-pre">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            </div>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
+              <TabsList className="grid w-full grid-cols-4 mb-4">
+                <TabsTrigger value="pretty" className="flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Pretty
+                </TabsTrigger>
+                <TabsTrigger value="raw" className="flex items-center gap-2">
+                  <Code2 className="h-4 w-4" />
+                  Raw
+                </TabsTrigger>
+                <TabsTrigger value="table" className="flex items-center gap-2">
+                  <Table className="h-4 w-4" />
+                  Table
+                </TabsTrigger>
+                <TabsTrigger value="edit" className="flex items-center gap-2">
+                  <Edit2 className="h-4 w-4" />
+                  Edit
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pretty" className="mt-0">
+                <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+                  <pre className="text-sm whitespace-pre">
+                    {JSON.stringify(data, null, 2)}
+                  </pre>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="raw" className="mt-0">
+                <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+                  <pre className="text-sm">
+                    {JSON.stringify(data)}
+                  </pre>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="table" className="mt-0">
+                <div className="bg-background rounded-lg p-4 max-h-[400px] overflow-auto border">
+                  {renderTableView(Array.isArray(data) ? data : data.jsonData)}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="edit" className="mt-0">
+                <div className="bg-background rounded-lg border h-[400px]">
+                  <MonacoEditor
+                    height="400px"
+                    language="json"
+                    theme="vs-light"
+                    value={editableJson}
+                    onChange={handleJsonEdit}
+                    options={{
+                      minimap: { enabled: false },
+                      lineNumbers: "on",
+                      scrollBeyondLastLine: false,
+                      wordWrap: "on",
+                      formatOnPaste: true,
+                    }}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <div className="flex gap-2">
               <Input
