@@ -5,7 +5,7 @@ import { OpenAI } from "openai";
 import multer from "multer";
 import * as Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { insertEndpointSchema } from "@shared/schema";
+import { insertEndpointSchema, insertSchemaSchema } from "@shared/schema";
 import { generateSchemaPrompt } from "./ai-prompts";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
@@ -199,10 +199,76 @@ function parseHTML(htmlContent: string): any {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", limiter);
 
+  // Schema Management Routes
+  app.get("/api/schemas", async (req, res) => {
+    try {
+      const schemas = await storage.listSchemas();
+      res.json(schemas);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/schemas", async (req, res) => {
+    try {
+      const schema = insertSchemaSchema.parse(req.body);
+      const created = await storage.createSchema(schema);
+      res.json(created);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/schemas/:id", async (req, res) => {
+    try {
+      const schema = insertSchemaSchema.parse(req.body);
+      const updated = await storage.updateSchema(req.params.id, schema);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/schemas/:id", async (req, res) => {
+    try {
+      await storage.deleteSchema(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Generate schema from JSON data
+  app.post("/api/generate-schema", async (req, res) => {
+    try {
+      const { data } = req.body;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
+          },
+          {
+            role: "user",
+            content: generateSchemaPrompt(data)
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const schema = JSON.parse(completion.choices[0].message.content || "{}");
+      res.json(schema);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Generate endpoint from text prompt
   app.post("/api/generate", async (req, res) => {
     try {
-      const { prompt, filterOptions, sortOptions } = req.body;
+      const { prompt, filterOptions, sortOptions, schemaId } = req.body;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -219,21 +285,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response_format: { type: "json_object" }
       });
 
-      let jsonData = JSON.parse(completion.choices[0].message.content);
+      let jsonData = JSON.parse(completion.choices[0].message.content || "{}");
 
-      // Apply filtering and sorting if provided
-      if (Array.isArray(jsonData) && filterOptions) {
-        jsonData = applyFilter(jsonData, filterOptions);
-      }
-
-      if (Array.isArray(jsonData) && sortOptions) {
-        jsonData = applySort(jsonData, sortOptions);
+      // Validate against schema if provided
+      if (schemaId) {
+        const schema = await storage.getSchema(schemaId);
+        if (schema) {
+          const zodSchema = z.object(schema.schema);
+          jsonData = zodSchema.parse(jsonData);
+        }
       }
 
       const endpoint = await storage.createEndpoint({
-        prompt,
+        name: prompt,
         jsonData,
-        fileName: null,
+        schemaId: schemaId || null,
         filterOptions: filterOptions || null,
         sortOptions: sortOptions || null
       });
@@ -448,32 +514,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
-  // Generate schema endpoint
-  app.post("/api/generate-schema", async (req, res) => {
-    try {
-      const { data } = req.body;
-      
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
-          },
-          {
-            role: "user",
-            content: generateSchemaPrompt(data)
-          }
-        ],
-        response_format: { type: "json_object" }
-      });
-
-      const schema = JSON.parse(completion.choices[0].message.content);
-      res.json(schema);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   return httpServer;
 }

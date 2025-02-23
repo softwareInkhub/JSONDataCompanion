@@ -1,4 +1,3 @@
-
 export function generateSchemaPrompt(data: any) {
   return `Analyze this JSON data and create a comprehensive Zod validation schema:
 
@@ -13,9 +12,15 @@ Requirements:
 
 Return the schema in this format:
 {
-  "schema": "Zod schema as string",
-  "validations": ["List of validation rules applied"],
-  "types": ["Generated TypeScript types"],
+  "schema": {
+    "type": "object",
+    "properties": {
+      // Your generated schema here
+    },
+    "required": ["array of required fields"],
+    "additionalProperties": false
+  },
+  "validations": ["List of all validation rules applied"],
   "examples": ["Valid data examples"]
 }`;
 }
