@@ -209,11 +209,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           {
             role: "system",
-            content: "You are a JSON data generator. Generate structured JSON data based on the user's prompt."
+            content: "You are a JSON data generator. Generate or modify structured JSON data based on the user's prompt and context."
           },
           {
             role: "user",
-            content: prompt
+            content: prompt.includes("Context:") ? prompt : `Generate JSON data for: ${prompt}`
           }
         ],
         response_format: { type: "json_object" }

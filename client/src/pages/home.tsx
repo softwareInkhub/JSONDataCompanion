@@ -151,9 +151,10 @@ export default function Home() {
 
   const handleEnhanceSubmit = async () => {
     try {
+      // Pass both the current data and enhancement prompt
       const enhanced = await promptMutation.mutateAsync({
         prompt: enhancePrompt,
-        context: prompt
+        context: JSON.stringify(result.jsonData) // Pass current JSON data as context
       });
       setResult(enhanced);
       setShowEnhanceDialog(false);
