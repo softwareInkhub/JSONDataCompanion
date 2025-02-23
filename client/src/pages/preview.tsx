@@ -9,27 +9,34 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Code2, Wand2, Edit2, Table, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import MonacoEditor from '@monaco-editor/react';
-import { DataGrid } from 'react-data-grid'; // Fixed import
+import { DataGrid } from 'react-data-grid';
+import 'react-data-grid/lib/styles.css';
 
 function flattenObject(obj: any, prefix = ''): any {
+  if (!obj || typeof obj !== 'object') return { [prefix]: obj };
+
   return Object.keys(obj).reduce((acc: any, k: string) => {
     const pre = prefix.length ? `${prefix}.` : '';
     if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
       Object.assign(acc, flattenObject(obj[k], pre + k));
     } else {
-      acc[pre + k] = obj[k];
+      acc[pre + k] = Array.isArray(obj[k]) ? JSON.stringify(obj[k]) : obj[k];
     }
     return acc;
   }, {});
 }
 
-function transformToTableData(data: any[]): { rows: any[], columns: any[] } {
-  if (!Array.isArray(data) || !data.length) {
+function transformToTableData(data: any): { rows: any[], columns: any[] } {
+  // Convert non-array data into array format
+  const arrayData = Array.isArray(data) ? data : [data];
+
+  // Handle empty data
+  if (!arrayData.length) {
     return { rows: [], columns: [] };
   }
 
-  // Handle nested objects by flattening them
-  const flattenedData = data.map(item => flattenObject(item));
+  // Flatten nested objects
+  const flattenedData = arrayData.map(item => flattenObject(item));
 
   // Get all unique keys for columns
   const allKeys = new Set<string>();
@@ -42,12 +49,12 @@ function transformToTableData(data: any[]): { rows: any[], columns: any[] } {
     name: key,
     resizable: true,
     sortable: true,
+    width: Math.max(100, key.length * 10),
     formatter: ({ row }: any) => {
       const value = row[key];
-      if (Array.isArray(value)) {
-        return JSON.stringify(value);
-      }
-      return value?.toString() || '';
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
     }
   }));
 
@@ -68,8 +75,8 @@ export default function Preview() {
 
   const tableData = useMemo(() => {
     if (!data) return { rows: [], columns: [] };
-    const jsonData = Array.isArray(data) ? data : (Array.isArray(data.jsonData) ? data.jsonData : [data]);
-    return transformToTableData(jsonData);
+    // Use data directly instead of looking for jsonData property
+    return transformToTableData(data);
   }, [data]);
 
   useEffect(() => {
@@ -78,6 +85,7 @@ export default function Preview() {
       fetch(`/api/${id}`)
         .then(res => res.json())
         .then(data => {
+          console.log("Fetched data:", data); // Debug log
           setData(data);
           setEditableJson(JSON.stringify(data, null, 2));
         })
@@ -163,14 +171,14 @@ export default function Preview() {
               <h3 className="text-sm font-medium text-muted-foreground">Request</h3>
               <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
                 {`curl --request GET \\
-  --url '${window.location.origin}/api/${data.id}'`}
+  --url '${window.location.origin}/api/${location.split("/").pop()}'`}
               </pre>
               <Button
                 variant="outline"
                 size="sm"
                 className="mt-2"
                 onClick={() => {
-                  navigator.clipboard.writeText(`curl --request GET --url '${window.location.origin}/api/${data.id}'`);
+                  navigator.clipboard.writeText(`curl --request GET --url '${window.location.origin}/api/${location.split("/").pop()}'`);
                   toast({
                     title: "Copied",
                     description: "Request copied to clipboard",
@@ -271,10 +279,18 @@ export default function Preview() {
               <TabsContent value="table" className="mt-0">
                 <div className="bg-background rounded-lg p-4 max-h-[400px] overflow-auto border">
                   <DataGrid
-                    className="fill-grid"
+                    className="rdg-light border-none"
                     columns={tableData.columns}
                     rows={tableData.rows}
-                    style={{ height: 350 }}
+                    defaultColumnOptions={{
+                      resizable: true,
+                      sortable: true
+                    }}
+                    style={{ 
+                      height: 350,
+                      border: 'none',
+                      backgroundColor: 'transparent'
+                    }}
                   />
                 </div>
               </TabsContent>
