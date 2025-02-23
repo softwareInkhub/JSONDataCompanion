@@ -1,9 +1,70 @@
 import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+const ApiTester = () => {
+  const { toast } = useToast();
+  const [apiUrl, setApiUrl] = useState("");
+  const [result, setResult] = useState<any>(null);
+
+  const testApi = async () => {
+    try {
+      const response = await fetch("/api/test-api", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: apiUrl }),
+      });
+
+      const data = await response.json();
+      setResult(data);
+
+      toast({
+        title: "API Test Successful",
+        description: "The API endpoint was tested successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to test API endpoint",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>API Tester</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter API URL"
+              value={apiUrl}
+              onChange={(e) => setApiUrl(e.target.value)}
+            />
+            <Button onClick={testApi}>Test API</Button>
+          </div>
+          {result && (
+            <pre className="mt-4 p-4 bg-gray-100 rounded overflow-auto">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+
 import { useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
-import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +72,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
 import { Loader2, Copy, Wand2, Upload, RefreshCw, Globe } from "lucide-react";
 import type { FilterOption, SortOption } from "@shared/schema";
-import { ApiTester } from "@/components/ApiTester";
 
 const examplePrompts = [
   "rick and morty characters",
@@ -360,7 +420,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <ApiTester apiUrl={result.apiUrl} />
+            <ApiTester />
           </div>
         )}
       </div>
