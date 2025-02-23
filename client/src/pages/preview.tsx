@@ -6,10 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Code2, Wand2, Edit2, Table, Eye } from "lucide-react";
+import { Copy, Code2, Wand2, Edit2, Table, Eye, Save } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import MonacoEditor from '@monaco-editor/react';
 import { DataGrid } from 'react-data-grid';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SchemaEditor } from "@/components/ui/schema-editor";
 import 'react-data-grid/lib/styles.css';
 
 function flattenObject(obj: any, prefix = ''): any {
@@ -76,6 +78,8 @@ export default function Preview() {
   const [showRequestDetails, setShowRequestDetails] = useState(false);
   const [viewMode, setViewMode] = useState<'pretty' | 'raw' | 'table' | 'edit'>('pretty');
   const [editableJson, setEditableJson] = useState("");
+  const [showSchemaDialog, setShowSchemaDialog] = useState(false);
+  const [generatedSchema, setGeneratedSchema] = useState<any>(null);
   const { toast } = useToast();
 
   const tableData = useMemo(() => {
@@ -142,6 +146,61 @@ export default function Preview() {
       });
     } catch (error) {
       console.error("Invalid JSON:", error);
+    }
+  };
+
+  const handleGenerateSchema = async () => {
+    try {
+      const response = await fetch("/api/generate-schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate schema");
+      }
+
+      const schema = await response.json();
+      setGeneratedSchema(schema);
+      setShowSchemaDialog(true);
+
+      toast({
+        title: "Success",
+        description: "Schema generated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveSchema = async (schema: any) => {
+    try {
+      const response = await fetch("/api/schemas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(schema)
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save schema");
+      }
+
+      setShowSchemaDialog(false);
+      toast({
+        title: "Success",
+        description: "Schema saved successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -223,9 +282,15 @@ export default function Preview() {
       >
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Preview & Enhance</h1>
-          <Button variant="outline" onClick={() => window.history.back()}>
-            Back to Home
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleGenerateSchema}>
+              <Save className="h-4 w-4 mr-2" />
+              Create Schema
+            </Button>
+            <Button variant="outline" onClick={() => window.history.back()}>
+              Back to Home
+            </Button>
+          </div>
         </div>
 
         <Card className="p-6">
@@ -333,6 +398,25 @@ export default function Preview() {
             </div>
           </div>
         </Card>
+
+        <Dialog open={showSchemaDialog} onOpenChange={setShowSchemaDialog}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Create Schema</DialogTitle>
+            </DialogHeader>
+            {generatedSchema && (
+              <SchemaEditor
+                schema={{
+                  name: "New Schema",
+                  schema: generatedSchema.schema,
+                  version: 1,
+                  createdAt: new Date()
+                }}
+                onSave={handleSaveSchema}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
         <div className="mt-6">
           <Button
