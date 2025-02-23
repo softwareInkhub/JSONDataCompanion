@@ -6,6 +6,7 @@ import multer from "multer";
 import * as Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { insertEndpointSchema } from "@shared/schema";
+import { generateSchemaPrompt } from "./ai-prompts";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import * as xml2js from "xml2js";
@@ -429,5 +430,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  // Generate schema endpoint
+  app.post("/api/generate-schema", async (req, res) => {
+    try {
+      const { data } = req.body;
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
+          },
+          {
+            role: "user",
+            content: generateSchemaPrompt(data)
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const schema = JSON.parse(completion.choices[0].message.content);
+      res.json(schema);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }

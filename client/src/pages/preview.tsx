@@ -1,15 +1,25 @@
-
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Wand2, Check } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+
 
 export default function Preview() {
   const [location] = useLocation();
   const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("pretty");
+  const [generatedSchema, setGeneratedSchema] = useState(null);
 
   useEffect(() => {
     const id = location.split("/").pop();
@@ -20,6 +30,28 @@ export default function Preview() {
         .catch(console.error);
     }
   }, [location]);
+
+  const generateSchema = async () => {
+    try {
+      const response = await fetch("/api/generate-schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: data }) // Use the existing 'data' state
+      });
+      const schema = await response.json();
+      setGeneratedSchema(schema);
+      toast({
+        title: "Success",
+        description: "Schema generated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   if (!data) return <div>Loading...</div>;
 
@@ -66,6 +98,43 @@ export default function Preview() {
           <Button variant="outline">Copy to Clipboard</Button>
           <Button variant="outline">Download JSON</Button>
           <Button variant="outline">Share</Button>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button onClick={generateSchema} className="gap-2">
+                <Wand2 className="h-4 w-4" />
+                Generate Schema
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-[400px] sm:w-[540px]">
+              <SheetHeader>
+                <SheetTitle>Generated Schema</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                {generatedSchema && (
+                  <div className="space-y-4">
+                    <div className="bg-muted rounded-lg p-4 overflow-auto max-h-[500px]">
+                      <pre className="text-sm">
+                        {JSON.stringify(generatedSchema, null, 2)}
+                      </pre>
+                    </div>
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => {
+                        // Placeholder for applying the schema
+                        toast({
+                          title: "Success",
+                          description: "Schema applied successfully",
+                        });
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                      Apply Schema
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </motion.div>
     </div>
