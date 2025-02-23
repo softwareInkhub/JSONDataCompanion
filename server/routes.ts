@@ -14,7 +14,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 const limiter = rateLimit({
@@ -33,6 +33,71 @@ interface SortOption {
   direction: "asc" | "desc";
 }
 
+function cleanData(data: any[]): any[] {
+  return data.map(row => {
+    const cleanRow: { [key: string]: any } = {};
+    for (const [key, value] of Object.entries(row)) {
+      // Remove special characters and spaces from keys
+      const cleanKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+      // Convert empty strings to null
+      cleanRow[cleanKey] = value === '' ? null : value;
+    }
+    return cleanRow;
+  });
+}
+
+function detectDataTypes(data: any[]): { [key: string]: string } {
+  const types: { [key: string]: Set<string> } = {};
+
+  data.forEach(row => {
+    Object.entries(row).forEach(([key, value]) => {
+      if (!types[key]) {
+        types[key] = new Set();
+      }
+
+      if (value === null) {
+        types[key].add('null');
+      } else if (typeof value === 'number') {
+        types[key].add('number');
+      } else if (!isNaN(Date.parse(value as string))) {
+        types[key].add('date');
+      } else {
+        types[key].add('string');
+      }
+    });
+  });
+
+  const finalTypes: { [key: string]: string } = {};
+  Object.entries(types).forEach(([key, typeSet]) => {
+    if (typeSet.has('number') && typeSet.size === 2 && typeSet.has('null')) {
+      finalTypes[key] = 'number';
+    } else if (typeSet.has('date') && typeSet.size === 2 && typeSet.has('null')) {
+      finalTypes[key] = 'date';
+    } else {
+      finalTypes[key] = 'string';
+    }
+  });
+
+  return finalTypes;
+}
+
+function convertDataTypes(data: any[], types: { [key: string]: string }): any[] {
+  return data.map(row => {
+    const convertedRow: { [key: string]: any } = {};
+    Object.entries(row).forEach(([key, value]) => {
+      if (value === null) {
+        convertedRow[key] = null;
+      } else if (types[key] === 'number') {
+        convertedRow[key] = Number(value);
+      } else if (types[key] === 'date') {
+        convertedRow[key] = new Date(value as string).toISOString();
+      } else {
+        convertedRow[key] = String(value);
+      }
+    });
+    return convertedRow;
+  });
+}
 
 function applyFilter(data: any[], filter: FilterOption) {
   return data.filter(item => {
@@ -113,7 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apiUrl: `/api/${endpoint.id}`
       });
 
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -130,12 +195,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (fileName.endsWith(".csv")) {
         const csvString = req.file.buffer.toString();
-        const { data } = Papa.parse(csvString, { header: true });
-        jsonData = data;
+        const { data, errors } = Papa.parse(csvString, { 
+          header: true,
+          skipEmptyLines: true,
+          dynamicTyping: true
+        });
+
+        if (errors.length > 0) {
+          return res.status(400).json({ 
+            error: "CSV parsing errors", 
+            details: errors 
+          });
+        }
+
+        // Clean and process the data
+        let processedData = cleanData(data);
+        const types = detectDataTypes(processedData);
+        jsonData = convertDataTypes(processedData, types);
+
       } else if (fileName.match(/\.xlsx?$/)) {
         const workbook = XLSX.read(req.file.buffer);
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        // Process all sheets
+        jsonData = {};
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          let data = XLSX.utils.sheet_to_json(sheet, { 
+            raw: false,
+            defval: null
+          });
+
+          // Clean and process the data
+          let processedData = cleanData(data);
+          const types = detectDataTypes(processedData);
+          jsonData[sheetName] = convertDataTypes(processedData, types);
+        });
+
+        // If there's only one sheet, use its data directly
+        if (workbook.SheetNames.length === 1) {
+          jsonData = jsonData[workbook.SheetNames[0]];
+        }
+
       } else {
         return res.status(400).json({ error: "Unsupported file format" });
       }
@@ -143,7 +243,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endpoint = await storage.createEndpoint({
         prompt: `File upload: ${fileName}`,
         fileName,
-        jsonData
+        jsonData,
+        filterOptions: null,
+        sortOptions: null
       });
 
       res.json({
@@ -152,8 +254,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apiUrl: `/api/${endpoint.id}`
       });
 
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: "File processing error",
+        message: error.message
+      });
     }
   });
 
@@ -181,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(jsonData);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
