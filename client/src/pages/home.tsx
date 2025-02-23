@@ -39,7 +39,11 @@ export default function Home() {
     accept: {
       'text/csv': ['.csv'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls']
+      'application/vnd.ms-excel': ['.xls'],
+      'application/json': ['.json'],
+      'text/xml': ['.xml'],
+      'text/html': ['.html'],
+      'text/plain': ['.txt']
     },
     maxFiles: 1,
     onDrop: async (files) => {
@@ -205,7 +209,7 @@ export default function Home() {
                   className="w-full"
                   disabled={isLoading}
                 >
-                  {isDragActive ? "Drop file here" : "Upload CSV/Excel"}
+                  {isDragActive ? "Drop file here" : "Upload CSV/Excel/JSON/XML/HTML/TXT"}
                 </Button>
               </div>
             </div>

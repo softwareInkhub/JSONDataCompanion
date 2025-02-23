@@ -8,6 +8,8 @@ import * as XLSX from "xlsx";
 import { insertEndpointSchema } from "@shared/schema";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
+import * as xml2js from "xml2js";
+import * as cheerio from "cheerio";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -130,6 +132,69 @@ function applySort(data: any[], sort: SortOption) {
   });
 }
 
+async function parseXML(xmlContent: string): Promise<any> {
+  try {
+    const parser = new xml2js.Parser({ 
+      explicitArray: false,
+      mergeAttrs: true,
+      normalize: true,
+      normalizeTags: true
+    });
+    return await parser.parseStringPromise(xmlContent);
+  } catch (error) {
+    throw new Error("Invalid XML format");
+  }
+}
+
+function parseHTML(htmlContent: string): any {
+  try {
+    const $ = cheerio.load(htmlContent);
+    const data: any = {};
+
+    // Extract table data if present
+    const tables: any[] = [];
+    $('table').each((i, table) => {
+      const tableData: any[] = [];
+      $(table).find('tr').each((j, row) => {
+        const rowData: any[] = [];
+        $(row).find('th, td').each((k, cell) => {
+          rowData.push($(cell).text().trim());
+        });
+        if (rowData.length > 0) {
+          tableData.push(rowData);
+        }
+      });
+      if (tableData.length > 0) {
+        tables.push(tableData);
+      }
+    });
+
+    if (tables.length > 0) {
+      data.tables = tables;
+    }
+
+    // Extract lists
+    const lists: any[] = [];
+    $('ul, ol').each((i, list) => {
+      const items: string[] = [];
+      $(list).find('li').each((j, item) => {
+        items.push($(item).text().trim());
+      });
+      if (items.length > 0) {
+        lists.push(items);
+      }
+    });
+
+    if (lists.length > 0) {
+      data.lists = lists;
+    }
+
+    return data;
+  } catch (error) {
+    throw new Error("Invalid HTML format");
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", limiter);
 
@@ -192,10 +257,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let jsonData;
       const fileName = req.file.originalname;
+      const fileContent = req.file.buffer.toString();
 
-      if (fileName.endsWith(".csv")) {
-        const csvString = req.file.buffer.toString();
-        const { data, errors } = Papa.parse(csvString, { 
+      if (fileName.endsWith(".json")) {
+        try {
+          jsonData = JSON.parse(fileContent);
+        } catch (error) {
+          return res.status(400).json({ error: "Invalid JSON format" });
+        }
+      } else if (fileName.endsWith(".xml")) {
+        try {
+          jsonData = await parseXML(fileContent);
+        } catch (error: any) {
+          return res.status(400).json({ error: error.message });
+        }
+      } else if (fileName.endsWith(".html")) {
+        try {
+          jsonData = parseHTML(fileContent);
+        } catch (error: any) {
+          return res.status(400).json({ error: error.message });
+        }
+      } else if (fileName.endsWith(".csv")) {
+        const { data, errors } = Papa.parse(fileContent, { 
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true
@@ -208,16 +291,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Clean and process the data
         let processedData = cleanData(data);
         const types = detectDataTypes(processedData);
         jsonData = convertDataTypes(processedData, types);
-
       } else if (fileName.match(/\.xlsx?$/)) {
         const workbook = XLSX.read(req.file.buffer);
-
-        // Process all sheets
         jsonData = {};
+
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
           let data = XLSX.utils.sheet_to_json(sheet, { 
@@ -225,17 +305,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             defval: null
           });
 
-          // Clean and process the data
           let processedData = cleanData(data);
           const types = detectDataTypes(processedData);
           jsonData[sheetName] = convertDataTypes(processedData, types);
         });
 
-        // If there's only one sheet, use its data directly
         if (workbook.SheetNames.length === 1) {
           jsonData = jsonData[workbook.SheetNames[0]];
         }
-
+      } else if (fileName.endsWith(".txt")) {
+        // Try to detect and parse the content format
+        const content = fileContent.trim();
+        try {
+          // Try JSON first
+          jsonData = JSON.parse(content);
+        } catch {
+          try {
+            // Try XML
+            jsonData = await parseXML(content);
+          } catch {
+            // Fallback to treating it as plain text
+            jsonData = { content: content.split('\n').map(line => line.trim()) };
+          }
+        }
       } else {
         return res.status(400).json({ error: "Unsupported file format" });
       }
