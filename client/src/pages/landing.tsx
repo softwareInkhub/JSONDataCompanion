@@ -1,10 +1,10 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 
 export default function Landing() {
-  const navigate = useNavigate()[1];
+  const [, navigate] = useLocation();
   
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-background to-secondary/20 flex flex-col items-center justify-center p-4">
