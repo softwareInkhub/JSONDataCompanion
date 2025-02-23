@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,53 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Code2, Wand2, Edit2, Table, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import MonacoEditor from '@monaco-editor/react';
+import { DataGrid } from 'react-data-grid'; // Fixed import
+
+function flattenObject(obj: any, prefix = ''): any {
+  return Object.keys(obj).reduce((acc: any, k: string) => {
+    const pre = prefix.length ? `${prefix}.` : '';
+    if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+      Object.assign(acc, flattenObject(obj[k], pre + k));
+    } else {
+      acc[pre + k] = obj[k];
+    }
+    return acc;
+  }, {});
+}
+
+function transformToTableData(data: any[]): { rows: any[], columns: any[] } {
+  if (!Array.isArray(data) || !data.length) {
+    return { rows: [], columns: [] };
+  }
+
+  // Handle nested objects by flattening them
+  const flattenedData = data.map(item => flattenObject(item));
+
+  // Get all unique keys for columns
+  const allKeys = new Set<string>();
+  flattenedData.forEach(item => {
+    Object.keys(item).forEach(key => allKeys.add(key));
+  });
+
+  const columns = Array.from(allKeys).map(key => ({
+    key,
+    name: key,
+    resizable: true,
+    sortable: true,
+    formatter: ({ row }: any) => {
+      const value = row[key];
+      if (Array.isArray(value)) {
+        return JSON.stringify(value);
+      }
+      return value?.toString() || '';
+    }
+  }));
+
+  return {
+    rows: flattenedData,
+    columns
+  };
+}
 
 export default function Preview() {
   const [location] = useLocation();
@@ -18,6 +65,12 @@ export default function Preview() {
   const [viewMode, setViewMode] = useState<'pretty' | 'raw' | 'table' | 'edit'>('pretty');
   const [editableJson, setEditableJson] = useState("");
   const { toast } = useToast();
+
+  const tableData = useMemo(() => {
+    if (!data) return { rows: [], columns: [] };
+    const jsonData = Array.isArray(data) ? data : (Array.isArray(data.jsonData) ? data.jsonData : [data]);
+    return transformToTableData(jsonData);
+  }, [data]);
 
   useEffect(() => {
     const id = location.split("/").pop();
@@ -80,36 +133,6 @@ export default function Preview() {
       // Don't update data if JSON is invalid
       console.error("Invalid JSON:", error);
     }
-  };
-
-  const renderTableView = (data: any) => {
-    if (!Array.isArray(data)) {
-      return <div className="text-muted-foreground">Table view is only available for array data</div>;
-    }
-
-    const columns = Object.keys(data[0] || {});
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-muted">
-              {columns.map((col) => (
-                <th key={col} className="p-2 text-left border">{col}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, i) => (
-              <tr key={i} className="hover:bg-muted/50">
-                {columns.map((col) => (
-                  <td key={col} className="p-2 border">{JSON.stringify(row[col])}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
   };
 
   if (!data) return (
@@ -220,9 +243,20 @@ export default function Preview() {
 
               <TabsContent value="pretty" className="mt-0">
                 <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-                  <pre className="text-sm whitespace-pre">
-                    {JSON.stringify(data, null, 2)}
-                  </pre>
+                  <MonacoEditor
+                    height="400px"
+                    language="json"
+                    theme="vs-light"
+                    value={JSON.stringify(data, null, 2)}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      lineNumbers: "on",
+                      scrollBeyondLastLine: false,
+                      wordWrap: "on",
+                      formatOnPaste: true,
+                    }}
+                  />
                 </div>
               </TabsContent>
 
@@ -236,7 +270,12 @@ export default function Preview() {
 
               <TabsContent value="table" className="mt-0">
                 <div className="bg-background rounded-lg p-4 max-h-[400px] overflow-auto border">
-                  {renderTableView(Array.isArray(data) ? data : data.jsonData)}
+                  <DataGrid
+                    className="fill-grid"
+                    columns={tableData.columns}
+                    rows={tableData.rows}
+                    style={{ height: 350 }}
+                  />
                 </div>
               </TabsContent>
 
