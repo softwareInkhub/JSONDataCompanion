@@ -20,10 +20,20 @@ export default function Preview() {
     if (id) {
       fetch(`/api/${id}`)
         .then(res => res.json())
-        .then(setData)
-        .catch(console.error);
+        .then(data => {
+          console.log("Fetched data:", data); // Debug log
+          setData(data);
+        })
+        .catch(error => {
+          console.error("Error fetching data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load data",
+            variant: "destructive",
+          });
+        });
     }
-  }, [location]);
+  }, [location, toast]);
 
   const handleEnhance = async () => {
     try {
@@ -32,7 +42,7 @@ export default function Preview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: enhancePrompt,
-          context: JSON.stringify(data)
+          context: data
         })
       });
       const result = await response.json();
@@ -52,13 +62,13 @@ export default function Preview() {
   };
 
   if (!data) return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center">
-      <div className="text-xl">Loading...</div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
+      <div className="text-xl animate-pulse">Loading...</div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted p-6">
       {/* Floating Request Details Button */}
       <Sheet open={showRequestDetails} onOpenChange={setShowRequestDetails}>
         <SheetTrigger asChild>
@@ -70,23 +80,23 @@ export default function Preview() {
             <Code2 className="h-5 w-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px] bg-black border-gray-800">
+        <SheetContent className="w-[400px] sm:w-[540px]">
           <SheetHeader>
-            <SheetTitle className="text-white">Request Details</SheetTitle>
+            <SheetTitle>Request Details</SheetTitle>
           </SheetHeader>
           <div className="mt-6 space-y-6">
             <div className="space-y-2">
-              <h3 className="text-sm font-medium text-gray-400">Request</h3>
-              <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-auto text-white">
+              <h3 className="text-sm font-medium text-muted-foreground">Request</h3>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
                 {`curl --request GET \\
-  --url '${window.location.origin}${data.apiUrl}'`}
+  --url '${window.location.origin}/api/${data.id}'`}
               </pre>
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-2 border-gray-800"
+                className="mt-2"
                 onClick={() => {
-                  navigator.clipboard.writeText(`curl --request GET --url '${window.location.origin}${data.apiUrl}'`);
+                  navigator.clipboard.writeText(`curl --request GET --url '${window.location.origin}/api/${data.id}'`);
                   toast({
                     title: "Copied",
                     description: "Request copied to clipboard",
@@ -99,16 +109,16 @@ export default function Preview() {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-sm font-medium text-gray-400">Response</h3>
-              <pre className="bg-gray-900 p-4 rounded-lg text-sm overflow-auto text-white">
-                {JSON.stringify(data.jsonData, null, 2)}
+              <h3 className="text-sm font-medium text-muted-foreground">Response</h3>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-auto">
+                {JSON.stringify(data, null, 2)}
               </pre>
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-2 border-gray-800"
+                className="mt-2"
                 onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify(data.jsonData, null, 2));
+                  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
                   toast({
                     title: "Copied",
                     description: "Response copied to clipboard",
@@ -130,16 +140,16 @@ export default function Preview() {
       >
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Preview & Enhance</h1>
-          <Button variant="outline" onClick={() => window.history.back()} className="border-gray-800">
+          <Button variant="outline" onClick={() => window.history.back()}>
             Back to Home
           </Button>
         </div>
 
-        <Card className="p-6 bg-black border-gray-800">
+        <Card className="p-6">
           <div className="space-y-6">
-            <div className="bg-gray-900 rounded-lg p-4 max-h-[400px] overflow-auto">
-              <pre className="text-sm whitespace-pre text-white">
-                {JSON.stringify(data.jsonData, null, 2)}
+            <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+              <pre className="text-sm whitespace-pre">
+                {JSON.stringify(data, null, 2)}
               </pre>
             </div>
 
@@ -148,13 +158,12 @@ export default function Preview() {
                 placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
                 value={enhancePrompt}
                 onChange={(e) => setEnhancePrompt(e.target.value)}
-                className="flex-1 bg-gray-900 border-gray-800"
+                className="flex-1"
               />
               <Button
                 variant="outline"
                 onClick={handleEnhance}
                 disabled={!enhancePrompt}
-                className="border-gray-800"
               >
                 <Wand2 className="h-4 w-4 mr-2" />
                 Enhance with AI
@@ -167,13 +176,12 @@ export default function Preview() {
           <Button
             variant="outline"
             onClick={() => {
-              navigator.clipboard.writeText(JSON.stringify(data.jsonData, null, 2));
+              navigator.clipboard.writeText(JSON.stringify(data, null, 2));
               toast({
                 title: "Copied",
                 description: "JSON data copied to clipboard",
               });
             }}
-            className="border-gray-800"
           >
             <Copy className="h-4 w-4 mr-2" />
             Copy to Clipboard
