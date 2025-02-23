@@ -2,229 +2,40 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { OpenAI } from "openai";
-import multer from "multer";
-import * as Papa from "papaparse";
-import * as XLSX from "xlsx";
-import { insertEndpointSchema, insertSchemaSchema } from "@shared/schema";
-import { generateSchemaPrompt } from "./ai-prompts";
 import { z } from "zod";
+import { generateSchemaPrompt } from "./ai-prompts";
+import { insertSchemaSchema } from "@shared/schema";
 import rateLimit from "express-rate-limit";
-import * as xml2js from "xml2js";
-import * as cheerio from "cheerio";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
-
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
 
-interface FilterOption {
-  field: string;
-  operator: "equals" | "contains" | "greaterThan" | "lessThan";
-  value: any;
-}
-
-interface SortOption {
-  field: string;
-  direction: "asc" | "desc";
-}
-
-function cleanData(data: any[]): any[] {
-  return data.map(row => {
-    const cleanRow: { [key: string]: any } = {};
-    for (const [key, value] of Object.entries(row)) {
-      // Remove special characters and spaces from keys
-      const cleanKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
-      // Convert empty strings to null
-      cleanRow[cleanKey] = value === '' ? null : value;
-    }
-    return cleanRow;
-  });
-}
-
-function detectDataTypes(data: any[]): { [key: string]: string } {
-  const types: { [key: string]: Set<string> } = {};
-
-  data.forEach(row => {
-    Object.entries(row).forEach(([key, value]) => {
-      if (!types[key]) {
-        types[key] = new Set();
-      }
-
-      if (value === null) {
-        types[key].add('null');
-      } else if (typeof value === 'number') {
-        types[key].add('number');
-      } else if (!isNaN(Date.parse(value as string))) {
-        types[key].add('date');
-      } else {
-        types[key].add('string');
-      }
-    });
-  });
-
-  const finalTypes: { [key: string]: string } = {};
-  Object.entries(types).forEach(([key, typeSet]) => {
-    if (typeSet.has('number') && typeSet.size === 2 && typeSet.has('null')) {
-      finalTypes[key] = 'number';
-    } else if (typeSet.has('date') && typeSet.size === 2 && typeSet.has('null')) {
-      finalTypes[key] = 'date';
-    } else {
-      finalTypes[key] = 'string';
-    }
-  });
-
-  return finalTypes;
-}
-
-function convertDataTypes(data: any[], types: { [key: string]: string }): any[] {
-  return data.map(row => {
-    const convertedRow: { [key: string]: any } = {};
-    Object.entries(row).forEach(([key, value]) => {
-      if (value === null) {
-        convertedRow[key] = null;
-      } else if (types[key] === 'number') {
-        convertedRow[key] = Number(value);
-      } else if (types[key] === 'date') {
-        convertedRow[key] = new Date(value as string).toISOString();
-      } else {
-        convertedRow[key] = String(value);
-      }
-    });
-    return convertedRow;
-  });
-}
-
-function applyFilter(data: any[], filter: FilterOption) {
-  return data.filter(item => {
-    const value = item[filter.field];
-    switch (filter.operator) {
-      case "equals":
-        return value === filter.value;
-      case "contains":
-        return String(value).toLowerCase().includes(filter.value.toLowerCase());
-      case "greaterThan":
-        return Number(value) > Number(filter.value);
-      case "lessThan":
-        return Number(value) < Number(filter.value);
-      default:
-        return true;
-    }
-  });
-}
-
-function applySort(data: any[], sort: SortOption) {
-  return [...data].sort((a, b) => {
-    const aVal = a[sort.field];
-    const bVal = b[sort.field];
-    const modifier = sort.direction === "asc" ? 1 : -1;
-
-    if (typeof aVal === "string") {
-      return aVal.localeCompare(bVal) * modifier;
-    }
-    return (aVal - bVal) * modifier;
-  });
-}
-
-async function parseXML(xmlContent: string): Promise<any> {
-  try {
-    const parser = new xml2js.Parser({ 
-      explicitArray: false,
-      mergeAttrs: true,
-      normalize: true,
-      normalizeTags: true
-    });
-    return await parser.parseStringPromise(xmlContent);
-  } catch (error) {
-    throw new Error("Invalid XML format");
+async function validateJsonWithSchema(jsonData: unknown, schema: any): Promise<unknown> {
+  const zodSchema = z.object(schema.properties).strict();
+  if (schema.required && schema.required.length > 0) {
+    return zodSchema.required(schema.required).parse(jsonData);
   }
-}
-
-function parseHTML(htmlContent: string): any {
-  try {
-    const $ = cheerio.load(htmlContent);
-    const data: any = {};
-
-    // Extract table data if present
-    const tables: any[] = [];
-    $('table').each((i, table) => {
-      const tableData: any[] = [];
-      $(table).find('tr').each((j, row) => {
-        const rowData: any[] = [];
-        $(row).find('th, td').each((k, cell) => {
-          rowData.push($(cell).text().trim());
-        });
-        if (rowData.length > 0) {
-          tableData.push(rowData);
-        }
-      });
-      if (tableData.length > 0) {
-        tables.push(tableData);
-      }
-    });
-
-    if (tables.length > 0) {
-      data.tables = tables;
-    }
-
-    // Extract lists
-    const lists: any[] = [];
-    $('ul, ol').each((i, list) => {
-      const items: string[] = [];
-      $(list).find('li').each((j, item) => {
-        items.push($(item).text().trim());
-      });
-      if (items.length > 0) {
-        lists.push(items);
-      }
-    });
-
-    if (lists.length > 0) {
-      data.lists = lists;
-    }
-
-    return data;
-  } catch (error) {
-    throw new Error("Invalid HTML format");
-  }
-}
-
-interface Schema {
-  schema: any;
-  required?: string[];
-}
-
-async function validateJsonWithSchema(jsonData: unknown, schema: Schema): Promise<unknown> {
-  const zodSchema = z.object(schema.schema.properties).strict();
-
-  if (schema.schema.required && schema.schema.required.length > 0) {
-    return zodSchema.required(schema.schema.required).parse(jsonData);
-  }
-
   return zodSchema.parse(jsonData);
 }
 
 async function regenerateSchemaFromValidationError(data: any, error: any): Promise<any> {
   const errorPrompt = `The following JSON schema validation failed for this data:
-Data: ${JSON.stringify(data)}
+Data: ${JSON.stringify(data, null, 2)}
 Error: ${error.message}
 
 Please generate a corrected JSON schema that properly validates this data structure.
-Return the schema as a JSON object.`;
+Ensure to handle all nested structures and data types correctly.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
         role: "system",
-        content: "You are a schema correction expert. Fix the schema to properly validate the given data. Return the response as a JSON object."
+        content: "You are a schema correction expert. Fix the schema to properly validate the given data structure. Ensure to handle nested objects, arrays, and all data types correctly."
       },
       {
         role: "user",
@@ -235,12 +46,13 @@ Return the schema as a JSON object.`;
   });
 
   const result = JSON.parse(completion.choices[0].message.content || "{}");
+  if (!result.schema || !result.schema.properties) {
+    throw new Error("Invalid schema format returned from AI");
+  }
   return result.schema;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.use("/api", limiter);
-
   // Schema Management Routes
   app.get("/api/schemas", async (req, res) => {
     try {
@@ -294,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [
           {
             role: "system",
-            content: "You are a schema generator that creates JSON validation schemas based on data structure analysis. Return the response as a JSON object."
+            content: "You are an expert schema generator that creates comprehensive JSON validation schemas. Analyze the data structure deeply and create appropriate validation rules. Handle nested objects, arrays, and all data types correctly."
           },
           {
             role: "user",
@@ -310,13 +122,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Invalid schema generated");
       }
 
-      // Validate the generated schema
+      // Validate the generated schema against the original data
       try {
-        const zodSchema = z.object(schema.schema.properties);
-        zodSchema.parse(data); // Test the schema against the original data
+        await validateJsonWithSchema(data, schema.schema);
       } catch (validationError: any) {
         console.warn("Generated schema validation failed:", validationError);
-        // Automatically adjust the schema based on validation errors
         schema.schema = await regenerateSchemaFromValidationError(data, validationError);
       }
 
@@ -324,8 +134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Schema generation error:", error);
       res.status(500).json({ 
-        error: error.message,
-        details: error.stack
+        error: "Failed to generate schema",
+        details: error.message
       });
     }
   });
@@ -577,6 +387,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.use("/api", limiter);
   const httpServer = createServer(app);
   return httpServer;
 }
+
+function cleanData(data: any[]): any[] {
+  return data.map(row => {
+    const cleanRow: { [key: string]: any } = {};
+    for (const [key, value] of Object.entries(row)) {
+      // Remove special characters and spaces from keys
+      const cleanKey = key.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+      // Convert empty strings to null
+      cleanRow[cleanKey] = value === '' ? null : value;
+    }
+    return cleanRow;
+  });
+}
+
+function detectDataTypes(data: any[]): { [key: string]: string } {
+  const types: { [key: string]: Set<string> } = {};
+
+  data.forEach(row => {
+    Object.entries(row).forEach(([key, value]) => {
+      if (!types[key]) {
+        types[key] = new Set();
+      }
+
+      if (value === null) {
+        types[key].add('null');
+      } else if (typeof value === 'number') {
+        types[key].add('number');
+      } else if (!isNaN(Date.parse(value as string))) {
+        types[key].add('date');
+      } else {
+        types[key].add('string');
+      }
+    });
+  });
+
+  const finalTypes: { [key: string]: string } = {};
+  Object.entries(types).forEach(([key, typeSet]) => {
+    if (typeSet.has('number') && typeSet.size === 2 && typeSet.has('null')) {
+      finalTypes[key] = 'number';
+    } else if (typeSet.has('date') && typeSet.size === 2 && typeSet.has('null')) {
+      finalTypes[key] = 'date';
+    } else {
+      finalTypes[key] = 'string';
+    }
+  });
+
+  return finalTypes;
+}
+
+function convertDataTypes(data: any[], types: { [key: string]: string }): any[] {
+  return data.map(row => {
+    const convertedRow: { [key: string]: any } = {};
+    Object.entries(row).forEach(([key, value]) => {
+      if (value === null) {
+        convertedRow[key] = null;
+      } else if (types[key] === 'number') {
+        convertedRow[key] = Number(value);
+      } else if (types[key] === 'date') {
+        convertedRow[key] = new Date(value as string).toISOString();
+      } else {
+        convertedRow[key] = String(value);
+      }
+    });
+    return convertedRow;
+  });
+}
+
+function applyFilter(data: any[], filter: FilterOption) {
+  return data.filter(item => {
+    const value = item[filter.field];
+    switch (filter.operator) {
+      case "equals":
+        return value === filter.value;
+      case "contains":
+        return String(value).toLowerCase().includes(filter.value.toLowerCase());
+      case "greaterThan":
+        return Number(value) > Number(filter.value);
+      case "lessThan":
+        return Number(value) < Number(filter.value);
+      default:
+        return true;
+    }
+  });
+}
+
+function applySort(data: any[], sort: SortOption) {
+  return [...data].sort((a, b) => {
+    const aVal = a[sort.field];
+    const bVal = b[sort.field];
+    const modifier = sort.direction === "asc" ? 1 : -1;
+
+    if (typeof aVal === "string") {
+      return aVal.localeCompare(bVal) * modifier;
+    }
+    return (aVal - bVal) * modifier;
+  });
+}
+
+async function parseXML(xmlContent: string): Promise<any> {
+  try {
+    const parser = new xml2js.Parser({ 
+      explicitArray: false,
+      mergeAttrs: true,
+      normalize: true,
+      normalizeTags: true
+    });
+    return await parser.parseStringPromise(xmlContent);
+  } catch (error) {
+    throw new Error("Invalid XML format");
+  }
+}
+
+function parseHTML(htmlContent: string): any {
+  try {
+    const $ = cheerio.load(htmlContent);
+    const data: any = {};
+
+    // Extract table data if present
+    const tables: any[] = [];
+    $('table').each((i, table) => {
+      const tableData: any[] = [];
+      $(table).find('tr').each((j, row) => {
+        const rowData: any[] = [];
+        $(row).find('th, td').each((k, cell) => {
+          rowData.push($(cell).text().trim());
+        });
+        if (rowData.length > 0) {
+          tableData.push(rowData);
+        }
+      });
+      if (tableData.length > 0) {
+        tables.push(tableData);
+      }
+    });
+
+    if (tables.length > 0) {
+      data.tables = tables;
+    }
+
+    // Extract lists
+    const lists: any[] = [];
+    $('ul, ol').each((i, list) => {
+      const items: string[] = [];
+      $(list).find('li').each((j, item) => {
+        items.push($(item).text().trim());
+      });
+      if (items.length > 0) {
+        lists.push(items);
+      }
+    });
+
+    if (lists.length > 0) {
+      data.lists = lists;
+    }
+
+    return data;
+  } catch (error) {
+    throw new Error("Invalid HTML format");
+  }
+}
+
+interface Schema {
+  schema: any;
+  required?: string[];
+}
+
+interface FilterOption {
+  field: string;
+  operator: "equals" | "contains" | "greaterThan" | "lessThan";
+  value: any;
+}
+
+interface SortOption {
+  field: string;
+  direction: "asc" | "desc";
+}
+
+
+import multer from "multer";
+import * as Papa from "papaparse";
+import * as XLSX from "xlsx";
+import * as xml2js from "xml2js";
+import * as cheerio from "cheerio";
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } 
+});

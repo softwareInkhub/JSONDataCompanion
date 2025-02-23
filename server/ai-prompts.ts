@@ -3,33 +3,56 @@ export function generateSchemaPrompt(data: any) {
 
 ${JSON.stringify(data, null, 2)}
 
-Requirements:
-1. Create strict type checking with appropriate validators for each field
-2. Add meaningful description for each field
-3. Determine which fields should be required based on data analysis
-4. For string fields:
-   - Add appropriate minLength/maxLength constraints
-   - Add pattern validation where applicable (e.g., email, url, etc.)
-5. For number fields:
-   - Add appropriate minimum/maximum constraints
-   - Determine if integers or floating points should be used
-6. For arrays:
-   - Define item types and validation
-   - Add length constraints if appropriate
-7. For nested objects:
-   - Create detailed sub-schemas
-   - Maintain proper type hierarchy
-8. Consider adding enum validations for fields with limited value sets
+Task: Create a detailed JSON Schema that accurately represents this data structure with proper validations.
 
-Return a JSON object in this format:
+Analysis Requirements:
+1. Deeply analyze the structure:
+   - Identify all nested objects and arrays
+   - Determine the depth of nesting
+   - Map relationships between objects
+   - Detect patterns in data values
+
+2. For each field, determine:
+   - Appropriate data type
+   - Required vs optional status
+   - Common patterns or formats
+   - Value constraints (min/max, patterns, etc.)
+   - Possible enumerated values
+
+3. For string fields:
+   - Identify formats (email, date, URL, etc.)
+   - Define length constraints
+   - Extract regex patterns
+   - List possible enum values if limited
+
+4. For number fields:
+   - Determine integer vs float
+   - Set minimum and maximum bounds
+   - Identify step values if applicable
+   - Define precision requirements
+
+5. For arrays:
+   - Define item types and validations
+   - Set length constraints
+   - Identify unique item requirements
+   - Handle nested array structures
+
+6. For objects:
+   - Create detailed sub-schemas
+   - Define required properties
+   - Set additional properties rules
+   - Handle nested object validation
+
+Return a JSON object with this exact structure:
 {
   "schema": {
     "type": "object",
     "properties": {
       "fieldName": {
         "type": "string|number|boolean|array|object",
-        "description": "Clear description of the field purpose",
+        "description": "Clear description of field purpose and usage",
         "required": true|false,
+        "format": "email|date|uri|etc",
         "minLength": number,
         "maxLength": number,
         "pattern": "regex pattern",
@@ -43,7 +66,18 @@ Return a JSON object in this format:
     "required": ["array of required fields"],
     "additionalProperties": false
   },
-  "validations": ["List of all validation rules applied"],
-  "examples": ["Valid data examples"]
-}`;
+  "validations": [
+    "List all validation rules applied"
+  ],
+  "examples": [
+    "Provide valid data examples"
+  ]
+}
+
+Important:
+- Analyze the actual data values to determine appropriate constraints
+- Include meaningful descriptions for each field
+- Ensure all nested structures are properly validated
+- Return response in valid JSON format
+- Make the schema as strict as possible while accommodating the data`;
 }
