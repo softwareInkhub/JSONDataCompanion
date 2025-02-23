@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
-import { Loader2, Copy, Wand2, Upload, RefreshCw, Globe, ChevronRight, ChevronDown, Plus, Minus } from "lucide-react";
+import { Loader2, Copy, Wand2, Upload, RefreshCw, Globe } from "lucide-react";
 import type { FilterOption, SortOption } from "@shared/schema";
+import { ApiTester } from "@/components/ApiTester";
 
 const examplePrompts = [
   "rick and morty characters",
@@ -21,22 +22,16 @@ const examplePrompts = [
 
 const httpMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
 
-interface QueryParam {
-  key: string;
-  value: string;
-}
-
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState<any>(null);
   const [enhancePrompt, setEnhancePrompt] = useState("");
+  const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
   const [showApiDialog, setShowApiDialog] = useState(false);
   const [apiUrl, setApiUrl] = useState("");
   const [apiMethod, setApiMethod] = useState("GET");
   const [apiHeaders, setApiHeaders] = useState("");
   const [apiBody, setApiBody] = useState("");
-  const [queryParams, setQueryParams] = useState<QueryParam[]>([{ key: "", value: "" }]);
-  const [expandedSections, setExpandedSections] = useState<string[]>([]);
   const { toast } = useToast();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -56,38 +51,6 @@ export default function Home() {
       }
     }
   });
-
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => 
-      prev.includes(section) 
-        ? prev.filter(s => s !== section)
-        : [...prev, section]
-    );
-  };
-
-  const addQueryParam = () => {
-    setQueryParams([...queryParams, { key: "", value: "" }]);
-  };
-
-  const removeQueryParam = (index: number) => {
-    setQueryParams(queryParams.filter((_, i) => i !== index));
-  };
-
-  const updateQueryParam = (index: number, field: 'key' | 'value', value: string) => {
-    const newParams = [...queryParams];
-    newParams[index] = { ...newParams[index], [field]: value };
-    setQueryParams(newParams);
-  };
-
-  const buildUrlWithParams = (baseUrl: string, params: QueryParam[]): string => {
-    const url = new URL(baseUrl);
-    params.forEach(param => {
-      if (param.key && param.value) {
-        url.searchParams.append(param.key, param.value);
-      }
-    });
-    return url.toString();
-  };
 
   const promptMutation = useMutation({
     mutationFn: async (input: { prompt: string; context?: string }) => {
@@ -137,7 +100,6 @@ export default function Home() {
       try {
         const headers = apiHeaders ? JSON.parse(apiHeaders) : {};
         const body = apiBody ? JSON.parse(apiBody) : undefined;
-        const finalUrl = buildUrlWithParams(apiUrl, queryParams);
 
         const response = await fetch('/api/test-api', {
           method: 'POST',
@@ -145,7 +107,7 @@ export default function Home() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            url: finalUrl,
+            url: apiUrl,
             method: apiMethod,
             headers,
             body,
@@ -183,7 +145,7 @@ export default function Home() {
     await navigator.clipboard.writeText(text);
     toast({
       title: "Copied",
-      description: "Content copied to clipboard",
+      description: "API URL copied to clipboard",
     });
   };
 
@@ -194,6 +156,7 @@ export default function Home() {
         context: prompt
       });
       setResult(enhanced);
+      setShowEnhanceDialog(false);
       setEnhancePrompt("");
       toast({
         title: "Success",
@@ -209,42 +172,6 @@ export default function Home() {
   };
 
   const isLoading = promptMutation.isPending || fileMutation.isPending || apiMutation.isPending;
-
-  const renderJSONPreview = (data: any, path: string = 'root') => {
-    if (typeof data !== 'object' || data === null) {
-      return <span className="text-green-600">{JSON.stringify(data)}</span>;
-    }
-
-    const isExpanded = expandedSections.includes(path);
-    const isArray = Array.isArray(data);
-    const entries = isArray ? data.entries() : Object.entries(data);
-
-    return (
-      <div className="pl-4">
-        <span 
-          className="cursor-pointer inline-flex items-center" 
-          onClick={() => toggleSection(path)}
-        >
-          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          {isArray ? '[' : '{'}
-        </span>
-        {isExpanded && (
-          <div className="pl-4">
-            {Array.from(entries).map(([key, value], index) => (
-              <div key={`${path}-${key}`} className="flex items-start">
-                <span className="text-blue-600">
-                  {isArray ? '' : `"${key}": `}
-                </span>
-                {renderJSONPreview(value, `${path}-${key}`)}
-                {index < (isArray ? data.length - 1 : Object.keys(data).length - 1) && ','}
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="pl-4">{isArray ? ']' : '}'}</div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -348,41 +275,6 @@ export default function Home() {
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <label className="flex items-center justify-between">
-                        Query Parameters
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={addQueryParam}
-                          type="button"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </label>
-                      {queryParams.map((param, index) => (
-                        <div key={index} className="flex gap-2">
-                          <Input
-                            placeholder="Key"
-                            value={param.key}
-                            onChange={(e) => updateQueryParam(index, 'key', e.target.value)}
-                          />
-                          <Input
-                            placeholder="Value"
-                            value={param.value}
-                            onChange={(e) => updateQueryParam(index, 'value', e.target.value)}
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removeQueryParam(index)}
-                            type="button"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid gap-2">
                       <label htmlFor="headers">Headers (JSON)</label>
                       <Textarea
                         id="headers"
@@ -439,17 +331,9 @@ export default function Home() {
 
                 <div className="space-y-4">
                   <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(JSON.stringify(result.jsonData, null, 2))}
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy JSON
-                      </Button>
-                    </div>
-                    {renderJSONPreview(result.jsonData)}
+                    <pre className="text-sm whitespace-pre">
+                      {JSON.stringify(result.jsonData, null, 2)}
+                    </pre>
                   </div>
                   <div className="flex gap-2">
                     <Input
@@ -474,6 +358,7 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
+
             <ApiTester apiUrl={result.apiUrl} />
           </div>
         )}
