@@ -140,21 +140,21 @@ export default function Home() {
             JSON Data AI
           </h1>
           <p className="text-xl text-muted-foreground">
-            Transform your ideas into structured data with AI
+            Get JSON data about anything with a prompt. Turn it into an API endpoint. Start fetching.
           </p>
         </div>
 
-        <Card className="max-w-2xl mx-auto">
+        <Card className="max-w-2xl mx-auto bg-black/5 backdrop-blur-sm border-0 shadow-lg">
           <CardContent className="pt-6 space-y-6">
             <div className="relative">
               <Textarea
-                placeholder="Enter your prompt (e.g., 'top western movies with name, director, release_date')"
+                placeholder="rick and morty characters with name, age, gender, short_info"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="min-h-[120px]"
+                className="min-h-[120px] pr-24 bg-black/10 border-0 resize-none placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-primary/20"
               />
               <Button
-                className="absolute right-2 top-2"
+                className="absolute right-2 top-2 bg-primary/10 hover:bg-primary/20 text-primary"
                 onClick={() => promptMutation.mutate(prompt)}
                 disabled={!prompt || isLoading}
               >
@@ -167,14 +167,14 @@ export default function Home() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {examplePrompts.map((example) => (
                 <Button
                   key={example}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setPrompt(example)}
-                  className="text-sm"
+                  className="text-sm text-muted-foreground hover:text-primary hover:bg-primary/10"
                 >
                   {example}
                 </Button>
@@ -186,7 +186,7 @@ export default function Home() {
                 <Input {...getInputProps()} />
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-dashed hover:border-primary hover:bg-primary/10"
                   disabled={isLoading}
                 >
                   <Upload className="h-4 w-4 mr-2" />
@@ -196,14 +196,14 @@ export default function Home() {
 
               <Dialog open={showApiDialog} onOpenChange={setShowApiDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1 border-dashed hover:border-primary hover:bg-primary/10">
                     <Globe className="h-4 w-4 mr-2" />
-                    Test REST API
+                    REST API
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Test REST API</DialogTitle>
+                    <DialogTitle>REST API</DialogTitle>
                     <DialogDescription>
                       Enter the API details to fetch and transform the data.
                     </DialogDescription>
@@ -216,12 +216,13 @@ export default function Home() {
                         value={apiUrl}
                         onChange={(e) => setApiUrl(e.target.value)}
                         placeholder="https://api.example.com/data"
+                        className="bg-black/5"
                       />
                     </div>
                     <div className="grid gap-2">
                       <label htmlFor="method">Method</label>
                       <Select value={apiMethod} onValueChange={setApiMethod}>
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-black/5">
                           <SelectValue placeholder="Select method" />
                         </SelectTrigger>
                         <SelectContent>
@@ -240,6 +241,7 @@ export default function Home() {
                         value={apiHeaders}
                         onChange={(e) => setApiHeaders(e.target.value)}
                         placeholder='{"Authorization": "Bearer token"}'
+                        className="bg-black/5"
                       />
                     </div>
                     <div className="grid gap-2">
@@ -249,6 +251,7 @@ export default function Home() {
                         value={apiBody}
                         onChange={(e) => setApiBody(e.target.value)}
                         placeholder='{"key": "value"}'
+                        className="bg-black/5"
                       />
                     </div>
                   </div>
