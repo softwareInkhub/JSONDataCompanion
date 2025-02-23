@@ -196,6 +196,21 @@ function parseHTML(htmlContent: string): any {
   }
 }
 
+interface Schema {
+  schema: any;
+  required?: string[];
+}
+
+async function validateJsonWithSchema(jsonData: unknown, schema: Schema): Promise<unknown> {
+  const zodSchema = z.object(schema.schema.properties).strict();
+
+  if (schema.schema.required && schema.schema.required.length > 0) {
+    return zodSchema.required(schema.schema.required).parse(jsonData);
+  }
+
+  return zodSchema.parse(jsonData);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", limiter);
 
@@ -291,8 +306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (schemaId) {
         const schema = await storage.getSchema(schemaId);
         if (schema) {
-          const zodSchema = z.object(schema.schema);
-          jsonData = zodSchema.parse(jsonData);
+          jsonData = await validateJsonWithSchema(jsonData, schema);
         }
       }
 

@@ -23,20 +23,37 @@ export const endpoints = pgTable("endpoints", {
 });
 
 // Schema validation types
-export const schemaPropertySchema = z.object({
-  type: z.enum(["string", "number", "boolean", "array", "object", "null"]),
-  description: z.string().optional(),
-  required: z.boolean().default(false),
-  format: z.string().optional(),
-  minimum: z.number().optional(),
-  maximum: z.number().optional(),
-  minLength: z.number().optional(),
-  maxLength: z.number().optional(),
-  pattern: z.string().optional(),
-  enum: z.array(z.union([z.string(), z.number()])).optional(),
-  items: z.lazy(() => schemaPropertySchema).optional(),
-  properties: z.record(z.lazy(() => schemaPropertySchema)).optional(),
-});
+export type SchemaProperty = {
+  type: "string" | "number" | "boolean" | "array" | "object" | "null";
+  description?: string;
+  required?: boolean;
+  format?: string;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  enum?: (string | number)[];
+  items?: SchemaProperty;
+  properties?: Record<string, SchemaProperty>;
+};
+
+export const schemaPropertySchema: z.ZodType<SchemaProperty> = z.lazy(() => 
+  z.object({
+    type: z.enum(["string", "number", "boolean", "array", "object", "null"]),
+    description: z.string().optional(),
+    required: z.boolean().optional(),
+    format: z.string().optional(),
+    minimum: z.number().optional(),
+    maximum: z.number().optional(),
+    minLength: z.number().optional(),
+    maxLength: z.number().optional(),
+    pattern: z.string().optional(),
+    enum: z.array(z.union([z.string(), z.number()])).optional(),
+    items: schemaPropertySchema.optional(),
+    properties: z.record(schemaPropertySchema).optional(),
+  })
+);
 
 export const insertSchemaSchema = createInsertSchema(schemas).extend({
   schema: z.object({
@@ -71,6 +88,5 @@ export type InsertSchema = z.infer<typeof insertSchemaSchema>;
 export type Schema = typeof schemas.$inferSelect;
 export type InsertEndpoint = z.infer<typeof insertEndpointSchema>;
 export type Endpoint = typeof endpoints.$inferSelect;
-export type SchemaProperty = z.infer<typeof schemaPropertySchema>;
 export type FilterOption = z.infer<typeof filterOptionSchema>;
 export type SortOption = z.infer<typeof sortOptionSchema>;
