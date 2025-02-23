@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
 import { Loader2, Copy, Edit, Wand2, Upload, RefreshCw } from "lucide-react";
 import type { FilterOption, SortOption } from "@shared/schema";
@@ -32,6 +33,8 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState("");
+  const [enhancePrompt, setEnhancePrompt] = useState("");
+  const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
   const [filterField, setFilterField] = useState("");
   const [filterOperator, setFilterOperator] = useState<FilterOption["operator"]>("equals");
   const [filterValue, setFilterValue] = useState("");
@@ -58,9 +61,11 @@ export default function Home() {
   });
 
   const promptMutation = useMutation({
-    mutationFn: async (prompt: string) => {
+    mutationFn: async (input: { prompt: string; context?: string }) => {
       const options: { prompt: string; filterOptions?: FilterOption; sortOptions?: SortOption } = {
-        prompt
+        prompt: input.context ? 
+          `Context: ${input.context}\nNew request: ${input.prompt}` : 
+          input.prompt
       };
 
       if (filterField && filterValue) {
@@ -78,7 +83,7 @@ export default function Home() {
         };
       }
 
-      return generateFromPrompt(prompt);
+      return generateFromPrompt(options.prompt);
     },
     onSuccess: (data) => {
       setResult(data);
@@ -125,11 +130,18 @@ export default function Home() {
   };
 
   const handleAIEdit = async () => {
+    setShowEnhanceDialog(true);
+  };
+
+  const handleEnhanceSubmit = async () => {
     try {
-      const enhanced = await promptMutation.mutateAsync(
-        `Enhance and improve this JSON data while maintaining its structure: ${editedData}`
-      );
+      const enhanced = await promptMutation.mutateAsync({
+        prompt: enhancePrompt,
+        context: prompt
+      });
       setEditedData(JSON.stringify(enhanced.jsonData, null, 2));
+      setShowEnhanceDialog(false);
+      setEnhancePrompt("");
       toast({
         title: "Success",
         description: "Data enhanced with AI",
@@ -247,7 +259,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <code className="block bg-muted p-4 rounded-lg overflow-x-auto">
+                <code className="block bg-muted p-4 rounded-lg text-sm break-all">
                   {window.location.origin}{result.apiUrl}
                 </code>
 
@@ -258,8 +270,8 @@ export default function Home() {
                   </TabsList>
 
                   <TabsContent value="preview" className="space-y-4">
-                    <div className="bg-muted rounded-lg p-4">
-                      <pre className="overflow-x-auto whitespace-pre-wrap">
+                    <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+                      <pre className="text-sm whitespace-pre">
                         {JSON.stringify(result.jsonData, null, 2)}
                       </pre>
                     </div>
@@ -267,15 +279,46 @@ export default function Home() {
 
                   <TabsContent value="edit" className="space-y-4">
                     <div className="flex gap-2 justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAIEdit}
-                        disabled={isLoading}
-                      >
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Enhance with AI
-                      </Button>
+                      <Dialog open={showEnhanceDialog} onOpenChange={setShowEnhanceDialog}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAIEdit}
+                            disabled={isLoading}
+                          >
+                            <Wand2 className="h-4 w-4 mr-2" />
+                            Enhance with AI
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Enhance with AI</DialogTitle>
+                            <DialogDescription>
+                              Describe how you want to enhance the data. Your request will be processed in the context of your original prompt.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <Textarea
+                            value={enhancePrompt}
+                            onChange={(e) => setEnhancePrompt(e.target.value)}
+                            placeholder="E.g., Add more details to each item, Sort by release date, etc."
+                            className="min-h-[100px]"
+                          />
+                          <DialogFooter>
+                            <Button
+                              onClick={handleEnhanceSubmit}
+                              disabled={!enhancePrompt || isLoading}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : (
+                                <Wand2 className="h-4 w-4 mr-2" />
+                              )}
+                              Enhance
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                       <Button
                         variant="outline"
                         size="sm"
@@ -286,11 +329,13 @@ export default function Home() {
                         Save Changes
                       </Button>
                     </div>
-                    <Textarea
-                      value={editedData}
-                      onChange={(e) => setEditedData(e.target.value)}
-                      className="font-mono min-h-[300px]"
-                    />
+                    <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+                      <Textarea
+                        value={editedData}
+                        onChange={(e) => setEditedData(e.target.value)}
+                        className="font-mono text-sm min-h-[300px] resize-none bg-transparent border-none focus-visible:ring-0"
+                      />
+                    </div>
                   </TabsContent>
                 </Tabs>
               </CardContent>
