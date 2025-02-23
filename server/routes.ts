@@ -10,6 +10,7 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import * as xml2js from "xml2js";
 import * as cheerio from "cheerio";
+import fetch from "node-fetch";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -380,6 +381,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(jsonData);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add /api/test-api endpoint after other routes
+  app.post("/api/test-api", async (req, res) => {
+    try {
+      const { url, method, headers, body } = req.body;
+
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const response = await fetch(url, {
+        method: method || 'GET',
+        headers: headers || {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Create a new endpoint with the fetched data
+      const endpoint = await storage.createEndpoint({
+        prompt: `API Test: ${url}`,
+        jsonData: data,
+        fileName: null,
+        filterOptions: null,
+        sortOptions: null
+      });
+
+      res.json({ 
+        id: endpoint.id,
+        jsonData: data,
+        apiUrl: `/api/${endpoint.id}`
+      });
+
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: "API request failed",
+        message: error.message
+      });
     }
   });
 

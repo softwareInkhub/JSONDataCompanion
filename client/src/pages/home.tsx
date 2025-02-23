@@ -7,10 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
-import { Loader2, Copy, Edit, Wand2, Upload, RefreshCw } from "lucide-react";
+import { Loader2, Copy, Wand2, Upload, RefreshCw, Globe } from "lucide-react";
 import type { FilterOption, SortOption } from "@shared/schema";
 import { ApiTester } from "@/components/ApiTester";
 
@@ -21,25 +20,18 @@ const examplePrompts = [
   "top western movies with name, director, release_date"
 ];
 
-const operators = [
-  { value: "equals", label: "Equals" },
-  { value: "contains", label: "Contains" },
-  { value: "greaterThan", label: "Greater Than" },
-  { value: "lessThan", label: "Less Than" }
-];
+const httpMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState("");
   const [enhancePrompt, setEnhancePrompt] = useState("");
   const [showEnhanceDialog, setShowEnhanceDialog] = useState(false);
-  const [filterField, setFilterField] = useState("");
-  const [filterOperator, setFilterOperator] = useState<FilterOption["operator"]>("equals");
-  const [filterValue, setFilterValue] = useState("");
-  const [sortField, setSortField] = useState("");
-  const [sortDirection, setSortDirection] = useState<SortOption["direction"]>("asc");
+  const [showApiDialog, setShowApiDialog] = useState(false);
+  const [apiUrl, setApiUrl] = useState("");
+  const [apiMethod, setApiMethod] = useState("GET");
+  const [apiHeaders, setApiHeaders] = useState("");
+  const [apiBody, setApiBody] = useState("");
   const { toast } = useToast();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -67,27 +59,10 @@ export default function Home() {
           `Context: ${input.context}\nNew request: ${input.prompt}` :
           input.prompt
       };
-
-      if (filterField && filterValue) {
-        options.filterOptions = {
-          field: filterField,
-          operator: filterOperator,
-          value: filterValue
-        };
-      }
-
-      if (sortField) {
-        options.sortOptions = {
-          field: sortField,
-          direction: sortDirection
-        };
-      }
-
       return generateFromPrompt(options.prompt);
     },
     onSuccess: (data) => {
       setResult(data);
-      setEditedData(JSON.stringify(data.jsonData, null, 2));
       toast({
         title: "Success",
         description: "JSON data generated successfully",
@@ -106,10 +81,55 @@ export default function Home() {
     mutationFn: generateFromFile,
     onSuccess: (data) => {
       setResult(data);
-      setEditedData(JSON.stringify(data.jsonData, null, 2));
       toast({
         title: "Success",
         description: "File processed successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const apiMutation = useMutation({
+    mutationFn: async () => {
+      try {
+        const headers = apiHeaders ? JSON.parse(apiHeaders) : {};
+        const body = apiBody ? JSON.parse(apiBody) : undefined;
+
+        const response = await fetch('/api/test-api', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: apiUrl,
+            method: apiMethod,
+            headers,
+            body,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('API request failed');
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error: any) {
+        throw new Error(error.message || 'Failed to fetch API data');
+      }
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      setShowApiDialog(false);
+      toast({
+        title: "Success",
+        description: "API data fetched successfully",
       });
     },
     onError: (error) => {
@@ -129,17 +149,13 @@ export default function Home() {
     });
   };
 
-  const handleAIEdit = async () => {
-    setShowEnhanceDialog(true);
-  };
-
   const handleEnhanceSubmit = async () => {
     try {
       const enhanced = await promptMutation.mutateAsync({
         prompt: enhancePrompt,
         context: prompt
       });
-      setEditedData(JSON.stringify(enhanced.jsonData, null, 2));
+      setResult(enhanced);
       setShowEnhanceDialog(false);
       setEnhancePrompt("");
       toast({
@@ -155,28 +171,7 @@ export default function Home() {
     }
   };
 
-  const saveEdits = () => {
-    try {
-      const parsed = JSON.parse(editedData);
-      setResult({
-        ...result,
-        jsonData: parsed
-      });
-      setIsEditing(false);
-      toast({
-        title: "Success",
-        description: "Changes saved successfully",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Invalid JSON format",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const isLoading = promptMutation.isPending || fileMutation.isPending;
+  const isLoading = promptMutation.isPending || fileMutation.isPending || apiMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -201,7 +196,7 @@ export default function Home() {
               />
               <Button
                 className="absolute right-2 top-2"
-                onClick={() => promptMutation.mutate(prompt)}
+                onClick={() => promptMutation.mutate({ prompt })}
                 disabled={!prompt || isLoading}
               >
                 {isLoading ? (
@@ -227,16 +222,89 @@ export default function Home() {
               ))}
             </div>
 
-            <div {...getRootProps()} className="cursor-pointer">
-              <Input {...getInputProps()} />
-              <Button
-                variant="outline"
-                className="w-full"
-                disabled={isLoading}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {isDragActive ? "Drop file here" : "Upload CSV/Excel/JSON/XML/HTML/TXT"}
-              </Button>
+            <div className="flex gap-2">
+              <div {...getRootProps()} className="flex-1">
+                <Input {...getInputProps()} />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isDragActive ? "Drop file here" : "Upload CSV/Excel/JSON/XML/HTML/TXT"}
+                </Button>
+              </div>
+
+              <Dialog open={showApiDialog} onOpenChange={setShowApiDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex-1">
+                    <Globe className="h-4 w-4 mr-2" />
+                    Test REST API
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Test REST API</DialogTitle>
+                    <DialogDescription>
+                      Enter the API details to fetch and transform the data.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <label htmlFor="url">API URL</label>
+                      <Input
+                        id="url"
+                        value={apiUrl}
+                        onChange={(e) => setApiUrl(e.target.value)}
+                        placeholder="https://api.example.com/data"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <label htmlFor="method">Method</label>
+                      <Select value={apiMethod} onValueChange={setApiMethod}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {httpMethods.map((method) => (
+                            <SelectItem key={method} value={method}>
+                              {method}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <label htmlFor="headers">Headers (JSON)</label>
+                      <Textarea
+                        id="headers"
+                        value={apiHeaders}
+                        onChange={(e) => setApiHeaders(e.target.value)}
+                        placeholder='{"Authorization": "Bearer token"}'
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <label htmlFor="body">Body (JSON)</label>
+                      <Textarea
+                        id="body"
+                        value={apiBody}
+                        onChange={(e) => setApiBody(e.target.value)}
+                        placeholder='{"key": "value"}'
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => apiMutation.mutate()} disabled={!apiUrl || isLoading}>
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Globe className="h-4 w-4 mr-2" />
+                      )}
+                      Test API
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>
@@ -247,118 +315,47 @@ export default function Home() {
               <CardContent className="pt-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Generated API Endpoint</h3>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(`${window.location.origin}${result.apiUrl}`)}
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy URL
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(`${window.location.origin}${result.apiUrl}`)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy URL
+                  </Button>
                 </div>
 
                 <code className="block bg-muted p-4 rounded-lg text-sm break-all">
                   {window.location.origin}{result.apiUrl}
                 </code>
 
-                <Tabs defaultValue="preview">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="preview">Preview</TabsTrigger>
-                    <TabsTrigger value="edit">Edit</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="preview" className="space-y-4">
-                    <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-                      <pre className="text-sm whitespace-pre">
-                        {JSON.stringify(result.jsonData, null, 2)}
-                      </pre>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
-                        value={enhancePrompt}
-                        onChange={(e) => setEnhancePrompt(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={handleEnhanceSubmit}
-                        disabled={!enhancePrompt || isLoading}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Wand2 className="h-4 w-4 mr-2" />
-                        )}
-                        Enhance
-                      </Button>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="edit" className="space-y-4">
-                    <div className="flex gap-2 justify-end">
-                      <Dialog open={showEnhanceDialog} onOpenChange={setShowEnhanceDialog}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAIEdit}
-                            disabled={isLoading}
-                          >
-                            <Wand2 className="h-4 w-4 mr-2" />
-                            Advanced Enhance
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Advanced AI Enhancement</DialogTitle>
-                            <DialogDescription>
-                              Describe complex changes or transformations you want to apply to the data.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <Textarea
-                            value={enhancePrompt}
-                            onChange={(e) => setEnhancePrompt(e.target.value)}
-                            placeholder="E.g., 'Add detailed plot summaries for each movie', 'Include box office earnings and awards'"
-                            className="min-h-[100px]"
-                          />
-                          <DialogFooter>
-                            <Button
-                              onClick={handleEnhanceSubmit}
-                              disabled={!enhancePrompt || isLoading}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              ) : (
-                                <Wand2 className="h-4 w-4 mr-2" />
-                              )}
-                              Apply Changes
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={saveEdits}
-                        disabled={isLoading}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </Button>
-                    </div>
-                    <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
-                      <Textarea
-                        value={editedData}
-                        onChange={(e) => setEditedData(e.target.value)}
-                        className="font-mono text-sm min-h-[300px] resize-none bg-transparent border-none focus-visible:ring-0"
-                      />
-                    </div>
-                  </TabsContent>
-
-                </Tabs>
+                <div className="space-y-4">
+                  <div className="bg-muted rounded-lg p-4 max-h-[400px] overflow-auto">
+                    <pre className="text-sm whitespace-pre">
+                      {JSON.stringify(result.jsonData, null, 2)}
+                    </pre>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Make desired changes (e.g., 'add ratings to movies', 'sort by year')"
+                      value={enhancePrompt}
+                      onChange={(e) => setEnhancePrompt(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleEnhanceSubmit}
+                      disabled={!enhancePrompt || isLoading}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Wand2 className="h-4 w-4 mr-2" />
+                      )}
+                      Enhance
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 

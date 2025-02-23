@@ -1,0 +1,51 @@
+Enhance the existing full-stack web application to include a feature where users can test any REST API. The feature should allow users to input a REST API URL, fetch data from it, preview the response, and then enhance or create a new API endpoint based on the fetched data.
+
+---
+
+### **Frontend (React.js with Tailwind CSS)**:
+1. Add a new section for **"Test REST API"** next to the existing prompt input field.
+   - Include a button labeled "Test REST API" that opens a modal.
+   - In the modal:
+     - Provide an input field for the user to enter a REST API URL.
+     - Include optional fields for HTTP method (GET, POST, etc.), headers (key-value pairs), and body (for POST/PUT requests).
+     - Add a "Test API" button to trigger the request.
+   - Display the fetched response in JSON format within the modal.
+
+2. Add an option to enhance or save the fetched data:
+   - Include a "Create Endpoint" button that allows users to process the fetched data using OpenAI and store it as a new endpoint in Supabase.
+
+3. Use Tailwind CSS for styling and React state management for handling modal visibility and form inputs.
+
+---
+
+### **Backend (Node.js with Express)**:
+1. Create a new route `POST /test-api` to handle REST API testing:
+   - Accept inputs such as:
+     - The target REST API URL.
+     - HTTP method (GET, POST, etc.).
+     - Headers (key-value pairs).
+     - Body (for POST/PUT requests).
+   - Use libraries like `axios` or `node-fetch` to make the request to the target REST API.
+   - Return the fetched response back to the frontend.
+
+2. Enhance the existing `POST /generate` route:
+   - Allow users to pass fetched data from `POST /test-api` as input.
+   - Process this data using OpenAI's GPT model for enhancement or transformation.
+   - Store the enhanced JSON in Supabase under a new endpoint ID.
+
+---
+
+### **Supabase Integration**:
+1. Extend the `endpoints` table schema to include metadata about REST API sources:
+   - `source_api_url`: Text (optional; stores the original REST API URL if applicable).
+
+2. Save enhanced data from tested APIs as new entries in Supabase.
+
+---
+
+### **Example Workflow**:
+1. User clicks "Test REST API" and enters:
+   - URL: `https://jsonplaceholder.typicode.com/posts`
+   - Method: `GET`
+2. Backend fetches data from this URL and returns it to the frontend.
+3. The frontend displays the response in JSON format within a modal:
