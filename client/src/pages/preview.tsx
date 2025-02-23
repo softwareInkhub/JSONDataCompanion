@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Code2, Wand2, Edit2, Table, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import MonacoEditor from '@monaco-editor/react';
+import { DataGrid } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 
 function flattenObject(obj: any, prefix = ''): any {
