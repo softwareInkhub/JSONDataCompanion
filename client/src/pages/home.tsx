@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
 import { Loader2, Copy, CheckCircle, Filter, SortAsc } from "lucide-react";
 import type { FilterOption, SortOption } from "@shared/schema";
+import { ApiTester } from "@/components/ApiTester";
 
 const examplePrompts = [
   "top western movies with name, director, release_date",
@@ -225,32 +226,36 @@ export default function Home() {
         </Card>
 
         {result && (
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Generated API Endpoint</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(`${window.location.origin}${result.apiUrl}`)}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy URL
-                </Button>
-              </div>
+          <>
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Generated API Endpoint</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(`${window.location.origin}${result.apiUrl}`)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy URL
+                  </Button>
+                </div>
 
-              <code className="block bg-muted p-4 rounded-lg overflow-x-auto">
-                {window.location.origin}{result.apiUrl}
-              </code>
+                <code className="block bg-muted p-4 rounded-lg overflow-x-auto">
+                  {window.location.origin}{result.apiUrl}
+                </code>
 
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold">JSON Preview</h3>
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
-                  {JSON.stringify(result.jsonData, null, 2)}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">JSON Preview</h3>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
+                    {JSON.stringify(result.jsonData, null, 2)}
+                  </pre>
+                </div>
+              </CardContent>
+            </Card>
+
+            <ApiTester apiUrl={result.apiUrl} />
+          </>
         )}
       </div>
     </div>
