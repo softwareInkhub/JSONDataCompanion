@@ -22,14 +22,57 @@ const limiter = rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 });
 
+interface FilterOption {
+  field: string;
+  operator: "equals" | "contains" | "greaterThan" | "lessThan";
+  value: any;
+}
+
+interface SortOption {
+  field: string;
+  direction: "asc" | "desc";
+}
+
+
+function applyFilter(data: any[], filter: FilterOption) {
+  return data.filter(item => {
+    const value = item[filter.field];
+    switch (filter.operator) {
+      case "equals":
+        return value === filter.value;
+      case "contains":
+        return String(value).toLowerCase().includes(filter.value.toLowerCase());
+      case "greaterThan":
+        return Number(value) > Number(filter.value);
+      case "lessThan":
+        return Number(value) < Number(filter.value);
+      default:
+        return true;
+    }
+  });
+}
+
+function applySort(data: any[], sort: SortOption) {
+  return [...data].sort((a, b) => {
+    const aVal = a[sort.field];
+    const bVal = b[sort.field];
+    const modifier = sort.direction === "asc" ? 1 : -1;
+
+    if (typeof aVal === "string") {
+      return aVal.localeCompare(bVal) * modifier;
+    }
+    return (aVal - bVal) * modifier;
+  });
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", limiter);
 
   // Generate endpoint from text prompt
   app.post("/api/generate", async (req, res) => {
     try {
-      const { prompt } = req.body;
-      
+      const { prompt, filterOptions, sortOptions } = req.body;
+
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -45,12 +88,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response_format: { type: "json_object" }
       });
 
-      const jsonData = JSON.parse(completion.choices[0].message.content);
-      
+      let jsonData = JSON.parse(completion.choices[0].message.content);
+
+      // Apply filtering and sorting if provided
+      if (Array.isArray(jsonData) && filterOptions) {
+        jsonData = applyFilter(jsonData, filterOptions);
+      }
+
+      if (Array.isArray(jsonData) && sortOptions) {
+        jsonData = applySort(jsonData, sortOptions);
+      }
+
       const endpoint = await storage.createEndpoint({
         prompt,
         jsonData,
-        fileName: null
+        fileName: null,
+        filterOptions: filterOptions || null,
+        sortOptions: sortOptions || null
       });
 
       res.json({ 
@@ -107,12 +161,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/:id", async (req, res) => {
     try {
       const endpoint = await storage.getEndpoint(req.params.id);
-      
+
       if (!endpoint) {
         return res.status(404).json({ error: "Endpoint not found" });
       }
 
-      res.json(endpoint.jsonData);
+      let jsonData = endpoint.jsonData;
+
+      // Apply runtime filtering and sorting if provided in query parameters
+      const filterOptions = req.query.filter ? JSON.parse(req.query.filter as string) : null;
+      const sortOptions = req.query.sort ? JSON.parse(req.query.sort as string) : null;
+
+      if (Array.isArray(jsonData) && filterOptions) {
+        jsonData = applyFilter(jsonData, filterOptions);
+      }
+
+      if (Array.isArray(jsonData) && sortOptions) {
+        jsonData = applySort(jsonData, sortOptions);
+      }
+
+      res.json(jsonData);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

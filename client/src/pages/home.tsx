@@ -6,8 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateFromPrompt, generateFromFile } from "@/lib/openai";
-import { Loader2, Copy, CheckCircle } from "lucide-react";
+import { Loader2, Copy, CheckCircle, Filter, SortAsc } from "lucide-react";
+import type { FilterOption, SortOption } from "@shared/schema";
 
 const examplePrompts = [
   "top western movies with name, director, release_date",
@@ -15,9 +17,21 @@ const examplePrompts = [
   "popular programming languages with name, creator, release_year"
 ];
 
+const operators = [
+  { value: "equals", label: "Equals" },
+  { value: "contains", label: "Contains" },
+  { value: "greaterThan", label: "Greater Than" },
+  { value: "lessThan", label: "Less Than" }
+];
+
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState<any>(null);
+  const [filterField, setFilterField] = useState("");
+  const [filterOperator, setFilterOperator] = useState<FilterOption["operator"]>("equals");
+  const [filterValue, setFilterValue] = useState("");
+  const [sortField, setSortField] = useState("");
+  const [sortDirection, setSortDirection] = useState<SortOption["direction"]>("asc");
   const { toast } = useToast();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -35,7 +49,28 @@ export default function Home() {
   });
 
   const promptMutation = useMutation({
-    mutationFn: generateFromPrompt,
+    mutationFn: async (prompt: string) => {
+      const options: { prompt: string; filterOptions?: FilterOption; sortOptions?: SortOption } = {
+        prompt
+      };
+
+      if (filterField && filterValue) {
+        options.filterOptions = {
+          field: filterField,
+          operator: filterOperator,
+          value: filterValue
+        };
+      }
+
+      if (sortField) {
+        options.sortOptions = {
+          field: sortField,
+          direction: sortDirection
+        };
+      }
+
+      return generateFromPrompt(prompt);
+    },
     onSuccess: (data) => {
       setResult(data);
       toast({
@@ -99,6 +134,56 @@ export default function Home() {
               className="min-h-[100px]"
             />
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Filter Options</h3>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Field name"
+                    value={filterField}
+                    onChange={(e) => setFilterField(e.target.value)}
+                  />
+                  <Select value={filterOperator} onValueChange={(value: any) => setFilterOperator(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select operator" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {operators.map(op => (
+                        <SelectItem key={op.value} value={op.value}>
+                          {op.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Filter value"
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Sort Options</h3>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Sort field"
+                    value={sortField}
+                    onChange={(e) => setSortField(e.target.value)}
+                  />
+                  <Select value={sortDirection} onValueChange={(value: any) => setSortDirection(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sort direction" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asc">Ascending</SelectItem>
+                      <SelectItem value="desc">Descending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-4">
               <Button
                 className="flex-1"
@@ -153,7 +238,7 @@ export default function Home() {
                   Copy URL
                 </Button>
               </div>
-              
+
               <code className="block bg-muted p-4 rounded-lg overflow-x-auto">
                 {window.location.origin}{result.apiUrl}
               </code>
