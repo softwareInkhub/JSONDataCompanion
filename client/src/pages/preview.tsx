@@ -13,6 +13,8 @@ import { DataGrid } from 'react-data-grid';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SchemaEditor } from "@/components/ui/schema-editor";
 import 'react-data-grid/lib/styles.css';
+import { QueryClient } from '@tanstack/react-query'; //Import needed for queryClient
+
 
 function flattenObject(obj: any, prefix = ''): any {
   if (!obj || typeof obj !== 'object') return { [prefix]: obj };
@@ -81,6 +83,7 @@ export default function Preview() {
   const [showSchemaDialog, setShowSchemaDialog] = useState(false);
   const [generatedSchema, setGeneratedSchema] = useState<any>(null);
   const { toast } = useToast();
+  const queryClient = new QueryClient(); // Initialize queryClient
 
   const tableData = useMemo(() => {
     if (!data) return { rows: [], columns: [] };
@@ -183,7 +186,10 @@ export default function Preview() {
       const response = await fetch("/api/schemas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(schema)
+        body: JSON.stringify({
+          ...schema,
+          name: schema.name || `Schema for ${location.split("/").pop()}`,
+        })
       });
 
       if (!response.ok) {
@@ -191,9 +197,10 @@ export default function Preview() {
       }
 
       setShowSchemaDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/schemas'] });
       toast({
         title: "Success",
-        description: "Schema saved successfully",
+        description: "Schema saved successfully. View it in the Schema Management section.",
       });
     } catch (error: any) {
       toast({

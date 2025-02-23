@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ export default function Schemas() {
   const [selectedSchema, setSelectedSchema] = useState<Schema | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: schemas, isLoading } = useQuery({
     queryKey: ['/api/schemas'],
@@ -36,6 +37,7 @@ export default function Schemas() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/schemas'] });
       toast({ title: "Success", description: "Schema created successfully" });
       setShowEditor(false);
     },
@@ -59,6 +61,7 @@ export default function Schemas() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/schemas'] });
       toast({ title: "Success", description: "Schema updated successfully" });
       setShowEditor(false);
     },
@@ -71,7 +74,9 @@ export default function Schemas() {
     }
   });
 
-  const handleSchemaEdit = (schemaJson: string) => {
+  const handleSchemaEdit = (schemaJson: string | undefined) => {
+    if (!schemaJson) return;
+
     try {
       const parsed = JSON.parse(schemaJson);
       const validatedSchema = z.object({
@@ -83,13 +88,14 @@ export default function Schemas() {
         updateSchemaMutation.mutate({
           ...selectedSchema,
           schema: validatedSchema,
-          version: selectedSchema.version + 1
+          version: selectedSchema.version || 1
         });
       } else {
         createSchemaMutation.mutate({
           name: "New Schema",
           schema: validatedSchema,
-          version: 1
+          version: 1,
+          createdAt: new Date()
         } as Schema);
       }
     } catch (error) {

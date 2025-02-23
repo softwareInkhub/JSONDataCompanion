@@ -211,6 +211,31 @@ async function validateJsonWithSchema(jsonData: unknown, schema: Schema): Promis
   return zodSchema.parse(jsonData);
 }
 
+async function regenerateSchemaFromValidationError(data: any, error: any): Promise<any> {
+  const errorPrompt = `The following schema validation failed for this data:
+Data: ${JSON.stringify(data)}
+Error: ${error.message}
+
+Please generate a corrected schema that properly validates this data structure.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: "You are a schema correction expert. Fix the schema to properly validate the given data."
+      },
+      {
+        role: "user",
+        content: errorPrompt
+      }
+    ],
+    response_format: { type: "json_object" }
+  });
+
+  return JSON.parse(completion.choices[0].message.content || "{}").schema;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", limiter);
 
@@ -258,22 +283,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { data } = req.body;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
-          },
-          {
-            role: "user",
-            content: generateSchemaPrompt(data)
-          }
-        ],
-        response_format: { type: "json_object" }
-      });
+    // Use OpenAI to analyze and generate schema
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are a schema generator that creates Zod validation schemas based on JSON data structure analysis."
+        },
+        {
+          role: "user",
+          content: generateSchemaPrompt(data)
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
 
-      const schema = JSON.parse(completion.choices[0].message.content || "{}");
+    let schema = JSON.parse(completion.choices[0].message.content || "{}");
+
+    // Validate the generated schema
+    try {
+      const zodSchema = z.object(schema.schema.properties);
+      zodSchema.parse(data); // Test the schema against the original data
+    } catch (validationError: any) {
+      console.warn("Generated schema validation failed:", validationError);
+      // Automatically adjust the schema based on validation errors
+      schema.schema = await regenerateSchemaFromValidationError(data, validationError);
+    }
+
       res.json(schema);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -355,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (fileName.endsWith(".html")) {
         try {
           jsonData = parseHTML(fileContent);
-        } catch (error: any) {
+        } catch (error) {
           return res.status(400).json({ error: error.message });
         }
       } else if (fileName.endsWith(".csv")) {
