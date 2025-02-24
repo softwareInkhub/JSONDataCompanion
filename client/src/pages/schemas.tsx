@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Database } from "lucide-react";
 import { type Schema } from "@shared/schema";
-import { z } from "zod";
-import MonacoEditor from '@monaco-editor/react';
 import { SchemaEditor } from "@/components/ui/schema-editor";
+import { DatabaseView } from "@/components/ui/database-view";
 
 export default function Schemas() {
   const [selectedSchema, setSelectedSchema] = useState<Schema | null>(null);
@@ -27,7 +27,6 @@ export default function Schemas() {
         throw new Error(errorData.error || 'Failed to fetch schemas');
       }
       const data = await response.json();
-      console.log('Fetched schemas:', data); // Debug log
       return data as Schema[];
     }
   });
@@ -116,7 +115,7 @@ export default function Schemas() {
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Schema Management</h1>
+        <h1 className="text-3xl font-bold">Schema & Database Management</h1>
         <Button onClick={() => {
           setSelectedSchema(null);
           setShowEditor(true);
@@ -126,33 +125,52 @@ export default function Schemas() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {schemas?.map((schema) => (
-          <Card key={schema.id} className="p-4">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="font-semibold">{schema.name}</h3>
-                <p className="text-sm text-muted-foreground">Version {schema.version}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setSelectedSchema(schema);
-                    setShowEditor(true);
-                  }}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <pre className="text-sm bg-muted p-2 rounded-md overflow-auto max-h-32">
-              {JSON.stringify(schema.schema, null, 2)}
-            </pre>
-          </Card>
-        ))}
-      </div>
+      <Tabs defaultValue="schemas" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="schemas" className="flex items-center gap-2">
+            <Edit2 className="h-4 w-4" />
+            Schemas
+          </TabsTrigger>
+          <TabsTrigger value="database" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Database
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schemas">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {schemas?.map((schema) => (
+              <Card key={schema.id} className="p-4">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-semibold">{schema.name}</h3>
+                    <p className="text-sm text-muted-foreground">Version {schema.version}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedSchema(schema);
+                        setShowEditor(true);
+                      }}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <pre className="text-sm bg-muted p-2 rounded-md overflow-auto max-h-32">
+                  {JSON.stringify(schema.schema, null, 2)}
+                </pre>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="database">
+          <DatabaseView />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showEditor} onOpenChange={setShowEditor}>
         <DialogContent className="sm:max-w-[800px]">

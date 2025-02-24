@@ -253,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ schema });
     } catch (error: any) {
       console.error("Schema generation error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to generate schema",
         details: error.message
       });
@@ -272,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(created);
     } catch (error: any) {
       console.error("Schema creation error:", error);
-      res.status(400).json({ 
+      res.status(400).json({
         error: error.message,
         details: error.errors || error.cause
       });
@@ -541,6 +541,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add this endpoint to handle SQL queries
+  app.post("/api/execute-sql", async (req, res) => {
+    try {
+      const { query } = req.body;
+
+      if (!query) {
+        return res.status(400).json({ error: "No query provided" });
+      }
+
+      // Execute the query using the sql tool
+      const result = await db.execute(query);
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({
+        error: "Query execution failed",
+        message: error.message
+      });
+    }
+  });
+
+  // Add this endpoint to fetch table data
+  app.get("/api/table-data/:table", async (req, res) => {
+    try {
+      const { table } = req.params;
+
+      if (!['schemas', 'endpoints'].includes(table)) {
+        return res.status(400).json({ error: "Invalid table name" });
+      }
+
+      const result = await db.select().from(table === 'schemas' ? schemas : endpoints);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({
+        error: "Failed to fetch table data",
+        message: error.message
+      });
+    }
+  });
+
+
   app.use("/api", limiter);
   const httpServer = createServer(app);
   return httpServer;
@@ -733,3 +774,4 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
 });
+//Assuming db, schemas, and endpoints are defined elsewhere.  This is incomplete without that context.
