@@ -14,42 +14,221 @@ const limiter = rateLimit({
   max: 100
 });
 
-async function validateJsonWithSchema(jsonData: unknown, schema: any): Promise<unknown> {
-  const zodSchema = z.object(schema.properties).strict();
-  if (schema.required && schema.required.length > 0) {
-    return zodSchema.required(schema.required).parse(jsonData);
+function createZodSchema(schemaProperty: any): z.ZodType {
+  try {
+    console.log('Creating Zod schema for property:', JSON.stringify(schemaProperty, null, 2));
+
+    if (!schemaProperty || !schemaProperty.type) {
+      throw new Error('Invalid schema property: missing type');
+    }
+
+    let schema: z.ZodType;
+
+    switch (schemaProperty.type) {
+      case "string": {
+        schema = z.string();
+        if (schemaProperty.minLength !== undefined) {
+          schema = schema.min(schemaProperty.minLength, `Minimum length is ${schemaProperty.minLength}`);
+        }
+        if (schemaProperty.maxLength !== undefined) {
+          schema = schema.max(schemaProperty.maxLength, `Maximum length is ${schemaProperty.maxLength}`);
+        }
+        if (schemaProperty.pattern) {
+          schema = schema.regex(new RegExp(schemaProperty.pattern), 'Invalid format');
+        }
+        break;
+      }
+
+      case "number": {
+        schema = z.number();
+        if (schemaProperty.minimum !== undefined) {
+          schema = schema.min(schemaProperty.minimum, `Minimum value is ${schemaProperty.minimum}`);
+        }
+        if (schemaProperty.maximum !== undefined) {
+          schema = schema.max(schemaProperty.maximum, `Maximum value is ${schemaProperty.maximum}`);
+        }
+        break;
+      }
+
+      case "boolean": {
+        schema = z.boolean();
+        break;
+      }
+
+      case "array": {
+        if (!schemaProperty.items) {
+          throw new Error('Array type must have items defined');
+        }
+        const itemSchema = createZodSchema(schemaProperty.items);
+        schema = z.array(itemSchema);
+        if (schemaProperty.minItems !== undefined) {
+          schema = schema.min(schemaProperty.minItems, `Minimum ${schemaProperty.minItems} items required`);
+        }
+        if (schemaProperty.maxItems !== undefined) {
+          schema = schema.max(schemaProperty.maxItems, `Maximum ${schemaProperty.maxItems} items allowed`);
+        }
+        break;
+      }
+
+      case "object": {
+        if (!schemaProperty.properties) {
+          throw new Error('Object type must have properties defined');
+        }
+
+        const shape: Record<string, z.ZodType> = {};
+        const required = new Set(schemaProperty.required || []);
+
+        // Process each property
+        for (const [key, value] of Object.entries(schemaProperty.properties)) {
+          let propertySchema = createZodSchema(value as any);
+
+          // Make non-required fields optional
+          if (!required.has(key)) {
+            propertySchema = propertySchema.optional();
+          }
+
+          shape[key] = propertySchema;
+        }
+
+        schema = z.object(shape);
+        break;
+      }
+
+      default:
+        throw new Error(`Unsupported schema type: ${schemaProperty.type}`);
+    }
+
+    if (schemaProperty.description) {
+      schema = schema.describe(schemaProperty.description);
+    }
+
+    return schema;
+  } catch (error) {
+    console.error('Error creating Zod schema:', error);
+    throw error;
   }
-  return zodSchema.parse(jsonData);
 }
 
-async function regenerateSchemaFromValidationError(data: any, error: any): Promise<any> {
-  const errorPrompt = `The following JSON schema validation failed for this data:
-Data: ${JSON.stringify(data, null, 2)}
-Error: ${error.message}
+async function validateJsonWithSchema(jsonData: unknown, schema: any): Promise<unknown> {
+  try {
+    console.log('Validating with schema:', JSON.stringify(schema, null, 2));
 
-Please generate a corrected JSON schema that properly validates this data structure.
-Ensure to handle all nested structures and data types correctly.`;
+    if (!schema.type || schema.type !== 'object' || !schema.properties) {
+      throw new Error('Invalid schema structure');
+    }
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: "You are a schema correction expert. Fix the schema to properly validate the given data structure. Ensure to handle nested objects, arrays, and all data types correctly."
-      },
-      {
-        role: "user",
-        content: errorPrompt
-      }
-    ],
-    response_format: { type: "json_object" }
-  });
+    const zodSchema = createZodSchema(schema);
+    console.log('Created Zod schema successfully');
 
-  const result = JSON.parse(completion.choices[0].message.content || "{}");
-  if (!result.schema || !result.schema.properties) {
-    throw new Error("Invalid schema format returned from AI");
+    const result = zodSchema.parse(jsonData);
+    console.log('Validation successful');
+    return result;
+  } catch (error) {
+    console.error('Schema validation error:', error);
+    throw error;
   }
-  return result.schema;
+}
+
+async function regenerateSchemaFromValidationError(data: any): Promise<any> {
+  try {
+    const inferType = (value: any): string => {
+      if (value === null) return "null";
+      if (Array.isArray(value)) return "array";
+      if (typeof value === "object") return "object";
+      return typeof value;
+    };
+
+    const inferValidations = (value: any, type: string): any => {
+      switch (type) {
+        case "string":
+          return {
+            minLength: value?.length || 0,
+            maxLength: value?.length ? value.length * 2 : 100
+          };
+        case "number":
+          return {
+            minimum: typeof value === "number" ? Math.floor(value) : null,
+            maximum: typeof value === "number" ? Math.ceil(value * 2) : null
+          };
+        default:
+          return {};
+      }
+    };
+
+    const inferSchema = (value: any): any => {
+      const type = inferType(value);
+      const baseSchema: any = {
+        type,
+        description: `${type} field`,
+        ...inferValidations(value, type)
+      };
+
+      if (type === "array") {
+        const sampleItem = value.length > 0 ? value[0] : null;
+        baseSchema.items = sampleItem ? inferSchema(sampleItem) : { type: "string" };
+        baseSchema.minItems = 0;
+        baseSchema.maxItems = value.length * 2 || 10;
+      } else if (type === "object") {
+        const properties: Record<string, any> = {};
+        const required: string[] = [];
+
+        Object.entries(value || {}).forEach(([key, val]) => {
+          properties[key] = inferSchema(val);
+          if (val !== null && val !== undefined) {
+            required.push(key);
+          }
+        });
+
+        baseSchema.properties = properties;
+        baseSchema.required = required;
+      }
+
+      return baseSchema;
+    };
+
+    console.log('Regenerating schema for data:', JSON.stringify(data, null, 2));
+    const schema = inferSchema(data);
+    console.log('Generated schema:', JSON.stringify(schema, null, 2));
+
+    return schema;
+  } catch (error) {
+    console.error("Error regenerating schema:", error);
+    throw error;
+  }
+}
+
+function inferSchemaFromData(data: any): any {
+  function createSchema(value: any): any {
+    if (Array.isArray(value)) {
+      const sampleItem = value.length > 0 ? value[0] : null;
+      return {
+        type: "array",
+        items: sampleItem ? createSchema(sampleItem) : { type: "string" }
+      };
+    }
+
+    if (typeof value === "object" && value !== null) {
+      const properties: Record<string, any> = {};
+      Object.entries(value).forEach(([key, val]) => {
+        properties[key] = createSchema(val);
+      });
+      return {
+        type: "object",
+        properties
+      };
+    }
+
+    return { type: typeof value };
+  }
+
+  try {
+    const schema = createSchema(data);
+    console.log('Generated schema:', JSON.stringify(schema, null, 2));
+    return schema;
+  } catch (error) {
+    console.error('Schema generation error:', error);
+    throw error;
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -60,6 +239,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(schemas);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/generate-schema", async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!data) {
+        return res.status(400).json({ error: "No data provided" });
+      }
+
+      const schema = inferSchemaFromData(data);
+      res.json({ schema });
+    } catch (error: any) {
+      console.error("Schema generation error:", error);
+      res.status(500).json({ 
+        error: "Failed to generate schema",
+        details: error.message
+      });
     }
   });
 
@@ -92,55 +289,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate schema from JSON data
-  app.post("/api/generate-schema", async (req, res) => {
-    try {
-      const { data } = req.body;
-
-      if (!data) {
-        return res.status(400).json({ error: "No data provided" });
-      }
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert schema generator that creates comprehensive JSON validation schemas. Analyze the data structure deeply and create appropriate validation rules. Handle nested objects, arrays, and all data types correctly."
-          },
-          {
-            role: "user",
-            content: generateSchemaPrompt(data)
-          }
-        ],
-        response_format: { type: "json_object" }
-      });
-
-      let schema = JSON.parse(completion.choices[0].message.content || "{}");
-
-      if (!schema.schema || !schema.schema.properties) {
-        throw new Error("Invalid schema generated");
-      }
-
-      // Validate the generated schema against the original data
-      try {
-        await validateJsonWithSchema(data, schema.schema);
-      } catch (validationError: any) {
-        console.warn("Generated schema validation failed:", validationError);
-        schema.schema = await regenerateSchemaFromValidationError(data, validationError);
-      }
-
-      res.json(schema);
-    } catch (error: any) {
-      console.error("Schema generation error:", error);
-      res.status(500).json({ 
-        error: "Failed to generate schema",
-        details: error.message
-      });
-    }
-  });
-
-  // Generate endpoint from text prompt
   app.post("/api/generate", async (req, res) => {
     try {
       const { prompt, filterOptions, sortOptions, schemaId } = req.body;
@@ -178,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortOptions: sortOptions || null
       });
 
-      res.json({ 
+      res.json({
         id: endpoint.id,
         jsonData,
         apiUrl: `/api/${endpoint.id}`
@@ -219,16 +367,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: error.message });
         }
       } else if (fileName.endsWith(".csv")) {
-        const { data, errors } = Papa.parse(fileContent, { 
+        const { data, errors } = Papa.parse(fileContent, {
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true
         });
 
         if (errors.length > 0) {
-          return res.status(400).json({ 
-            error: "CSV parsing errors", 
-            details: errors 
+          return res.status(400).json({
+            error: "CSV parsing errors",
+            details: errors
           });
         }
 
@@ -241,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         workbook.SheetNames.forEach(sheetName => {
           const sheet = workbook.Sheets[sheetName];
-          let data = XLSX.utils.sheet_to_json(sheet, { 
+          let data = XLSX.utils.sheet_to_json(sheet, {
             raw: false,
             defval: null
           });
@@ -288,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error: any) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "File processing error",
         message: error.message
       });
@@ -372,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sourceApiUrl: url // Store the source API URL
       });
 
-      res.json({ 
+      res.json({
         id: endpoint.id,
         jsonData: data,
         apiUrl: `/api/${endpoint.id}`,
@@ -380,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error: any) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "API request failed",
         message: error.message
       });
@@ -491,7 +639,7 @@ function applySort(data: any[], sort: SortOption) {
 
 async function parseXML(xmlContent: string): Promise<any> {
   try {
-    const parser = new xml2js.Parser({ 
+    const parser = new xml2js.Parser({
       explicitArray: false,
       mergeAttrs: true,
       normalize: true,
@@ -575,7 +723,7 @@ import * as XLSX from "xlsx";
 import * as xml2js from "xml2js";
 import * as cheerio from "cheerio";
 
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } 
+  limits: { fileSize: 10 * 1024 * 1024 }
 });

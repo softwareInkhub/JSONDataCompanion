@@ -1,47 +1,14 @@
 export function generateSchemaPrompt(data: any) {
-  return `Analyze this JSON data and create a comprehensive JSON schema with validations:
+  return `Create a JSON Schema for the following data structure:
 
 ${JSON.stringify(data, null, 2)}
 
-Task: Create a detailed JSON Schema that accurately represents this data structure with proper validations.
-
-Analysis Requirements:
-1. Deeply analyze the structure:
-   - Identify all nested objects and arrays
-   - Determine the depth of nesting
-   - Map relationships between objects
-   - Detect patterns in data values
-
-2. For each field, determine:
-   - Appropriate data type
-   - Required vs optional status
-   - Common patterns or formats
-   - Value constraints (min/max, patterns, etc.)
-   - Possible enumerated values
-
-3. For string fields:
-   - Identify formats (email, date, URL, etc.)
-   - Define length constraints
-   - Extract regex patterns
-   - List possible enum values if limited
-
-4. For number fields:
-   - Determine integer vs float
-   - Set minimum and maximum bounds
-   - Identify step values if applicable
-   - Define precision requirements
-
-5. For arrays:
-   - Define item types and validations
-   - Set length constraints
-   - Identify unique item requirements
-   - Handle nested array structures
-
-6. For objects:
-   - Create detailed sub-schemas
-   - Define required properties
-   - Set additional properties rules
-   - Handle nested object validation
+Rules for schema generation:
+1. The schema must be a valid JSON Schema
+2. Each field must have appropriate type and validation rules
+3. Handle all nested structures correctly
+4. Add meaningful field descriptions
+5. Include appropriate constraints (min/max, patterns, etc.)
 
 Return a JSON object with this exact structure:
 {
@@ -49,35 +16,31 @@ Return a JSON object with this exact structure:
     "type": "object",
     "properties": {
       "fieldName": {
-        "type": "string|number|boolean|array|object",
-        "description": "Clear description of field purpose and usage",
-        "required": true|false,
-        "format": "email|date|uri|etc",
-        "minLength": number,
-        "maxLength": number,
-        "pattern": "regex pattern",
-        "minimum": number,
-        "maximum": number,
-        "enum": ["possible", "values"],
-        "items": { /* For array types */ },
-        "properties": { /* For object types */ }
+        "type": "string" | "number" | "boolean" | "array" | "object",
+        "description": "Description of what this field represents",
+        "minLength": number,        // For strings
+        "maxLength": number,        // For strings
+        "pattern": "regex",         // For strings
+        "minimum": number,          // For numbers
+        "maximum": number,          // For numbers
+        "items": {                  // For arrays
+          "type": "string" | "number" | "boolean" | "object",
+          // ... item validations
+        },
+        "properties": {             // For objects
+          // ... nested property definitions
+        }
       }
     },
-    "required": ["array of required fields"],
+    "required": ["list", "of", "required", "fields"],
     "additionalProperties": false
-  },
-  "validations": [
-    "List all validation rules applied"
-  ],
-  "examples": [
-    "Provide valid data examples"
-  ]
+  }
 }
 
-Important:
-- Analyze the actual data values to determine appropriate constraints
-- Include meaningful descriptions for each field
-- Ensure all nested structures are properly validated
-- Return response in valid JSON format
-- Make the schema as strict as possible while accommodating the data`;
+IMPORTANT:
+- All field types must be one of: "string", "number", "boolean", "array", or "object"
+- Nested objects must follow the same structure
+- Array items must have proper type definitions
+- Required fields must be listed in the root "required" array
+- The response must be valid JSON (no comments)`;
 }
