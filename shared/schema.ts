@@ -39,14 +39,17 @@ export const schemaPropertySchema = z.object({
 });
 
 // Schema validation schema
-export const insertSchemaSchema = createInsertSchema(schemas).extend({
+export const insertSchemaSchema = createInsertSchema(schemas, {
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, "Name is required"),
+  version: z.number().int().positive().default(1),
   schema: z.object({
     type: z.literal("object"),
     properties: z.record(schemaPropertySchema),
     required: z.array(z.string()).optional(),
     additionalProperties: z.boolean().optional(),
   })
-});
+}).omit({ createdAt: true }); // Let the database handle createdAt with defaultNow()
 
 export const insertEndpointSchema = createInsertSchema(endpoints);
 
