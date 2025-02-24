@@ -262,11 +262,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/schemas", async (req, res) => {
     try {
+      console.log("Receiving schema creation request:", req.body);
       const schema = insertSchemaSchema.parse(req.body);
+      console.log("Validated schema:", schema);
+
       const created = await storage.createSchema(schema);
+      console.log("Created schema in database:", created);
+
       res.json(created);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Schema creation error:", error);
+      res.status(400).json({ 
+        error: error.message,
+        details: error.errors || error.cause
+      });
     }
   });
 

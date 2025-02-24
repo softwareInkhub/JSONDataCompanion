@@ -213,9 +213,10 @@ export default function Preview() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...schema,
           name: schema.name || `Schema for ${location.split("/").pop()}`,
-          id: undefined
+          schema: schema.schema,
+          version: 1,
+          createdAt: new Date()
         })
       });
 
