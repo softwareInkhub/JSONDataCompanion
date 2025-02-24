@@ -6,9 +6,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 import { Label } from "./label";
 import { useToast } from "@/hooks/use-toast";
 import MonacoEditor from '@monaco-editor/react';
-import { DataGrid } from 'react-data-grid';
 import { Database, Table2, Play, Loader2 } from "lucide-react";
-import 'react-data-grid/lib/styles.css';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface TableInfo {
   tableName: string;
@@ -67,10 +73,10 @@ export function DatabaseView() {
 
       const data = await response.json();
 
-      // Transform data for DataGrid
+      // Transform data for display
       const rows = data.map((row: any) => ({
         ...row,
-        schema: typeof row.schema === 'object' ? JSON.stringify(row.schema) : row.schema,
+        schema: typeof row.schema === 'object' ? JSON.stringify(row.schema, null, 2) : row.schema,
         created_at: new Date(row.created_at).toLocaleString()
       }));
 
@@ -87,21 +93,10 @@ export function DatabaseView() {
     }
   };
 
-  const getTableColumns = (data: any[]) => {
-    if (!data.length) return [];
-    return Object.keys(data[0]).map(key => ({
-      key,
-      name: key,
-      resizable: true,
-      sortable: true,
-      width: key === 'schema' ? 300 : undefined,
-      formatter: ({ row }: { row: any }) => {
-        const value = row[key];
-        if (value === null || value === undefined) return '';
-        if (typeof value === 'object') return JSON.stringify(value);
-        return String(value);
-      }
-    }));
+  const renderTableCell = (value: any) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    return String(value);
   };
 
   return (
@@ -224,12 +219,32 @@ export function DatabaseView() {
             {!isLoading && selectedTable && tableData.length > 0 && (
               <div className="mt-6">
                 <h4 className="font-medium mb-4">Table: {selectedTable}</h4>
-                <div className="border rounded-md overflow-hidden h-[400px]">
-                  <DataGrid
-                    columns={getTableColumns(tableData)}
-                    rows={tableData}
-                    className="rdg-light"
-                  />
+                <div className="border rounded-md overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {Object.keys(tableData[0]).map((key) => (
+                          <TableHead key={key} className="min-w-[150px]">
+                            {key}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tableData.map((row, index) => (
+                        <TableRow key={index}>
+                          {Object.values(row).map((value: any, cellIndex) => (
+                            <TableCell 
+                              key={cellIndex}
+                              className="font-mono text-sm whitespace-pre-wrap"
+                            >
+                              {renderTableCell(value)}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             )}
