@@ -4,8 +4,9 @@ import { storage } from "./storage";
 import { OpenAI } from "openai";
 import { z } from "zod";
 import { generateSchemaPrompt } from "./ai-prompts";
-import { insertSchemaSchema } from "@shared/schema";
+import { insertSchemaSchema, schemas, endpoints } from "@shared/schema";
 import rateLimit from "express-rate-limit";
+import { db } from "./db";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -541,7 +542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add this endpoint to handle SQL queries
+  // Update the SQL query execution endpoint
   app.post("/api/execute-sql", async (req, res) => {
     try {
       const { query } = req.body;
@@ -550,11 +551,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No query provided" });
       }
 
-      // Execute the query using the sql tool
+      // Execute the query using drizzle
       const result = await db.execute(query);
 
-      res.json(result);
+      // Transform the result to handle dates and complex objects
+      const transformedResult = JSON.parse(JSON.stringify(result, (key, value) => {
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        return value;
+      }));
+
+      res.json(transformedResult);
     } catch (error: any) {
+      console.error('SQL execution error:', error);
       res.status(500).json({
         error: "Query execution failed",
         message: error.message
@@ -562,7 +572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add this endpoint to fetch table data
+  // Update the table data endpoint
   app.get("/api/table-data/:table", async (req, res) => {
     try {
       const { table } = req.params;
@@ -572,8 +582,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await db.select().from(table === 'schemas' ? schemas : endpoints);
-      res.json(result);
+
+      // Transform the result to handle dates and complex objects
+      const transformedResult = JSON.parse(JSON.stringify(result, (key, value) => {
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        return value;
+      }));
+
+      res.json(transformedResult);
     } catch (error: any) {
+      console.error('Table data fetch error:', error);
       res.status(500).json({
         error: "Failed to fetch table data",
         message: error.message
@@ -774,4 +794,3 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
 });
-//Assuming db, schemas, and endpoints are defined elsewhere.  This is incomplete without that context.

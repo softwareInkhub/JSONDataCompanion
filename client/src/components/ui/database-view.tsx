@@ -7,7 +7,7 @@ import { Label } from "./label";
 import { useToast } from "@/hooks/use-toast";
 import MonacoEditor from '@monaco-editor/react';
 import { DataGrid } from 'react-data-grid';
-import { Database, Table2, Play } from "lucide-react";
+import { Database, Table2, Play, Loader2 } from "lucide-react";
 
 interface TableInfo {
   tableName: string;
@@ -58,11 +58,22 @@ export function DatabaseView() {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/table-data/${tableName}`);
+
       if (!response.ok) {
-        throw new Error('Failed to load table data');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to load table data');
       }
+
       const data = await response.json();
-      setTableData(data);
+
+      // Transform data for DataGrid
+      const rows = data.map((row: any) => ({
+        ...row,
+        schema: typeof row.schema === 'object' ? JSON.stringify(row.schema) : row.schema,
+        created_at: new Date(row.created_at).toLocaleString()
+      }));
+
+      setTableData(rows);
       setSelectedTable(tableName);
     } catch (error: any) {
       toast({
@@ -73,6 +84,17 @@ export function DatabaseView() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getTableColumns = (data: any[]) => {
+    if (!data.length) return [];
+    return Object.keys(data[0]).map(key => ({
+      key,
+      name: key,
+      resizable: true,
+      sortable: true,
+      width: key === 'schema' ? 300 : undefined
+    }));
   };
 
   return (
@@ -140,7 +162,17 @@ export function DatabaseView() {
               disabled={!queryInput.trim() || isLoading}
               className="w-full"
             >
-              {isLoading ? "Executing..." : "Execute Query"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Executing...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Execute Query
+                </>
+              )}
             </Button>
             {queryResult && (
               <div className="mt-4">
@@ -157,7 +189,7 @@ export function DatabaseView() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card 
-                className="p-4 cursor-pointer hover:bg-accent"
+                className="p-4 cursor-pointer hover:bg-accent transition-colors"
                 onClick={() => loadTableData('schemas')}
               >
                 <h4 className="font-medium">schemas</h4>
@@ -166,7 +198,7 @@ export function DatabaseView() {
                 </p>
               </Card>
               <Card 
-                className="p-4 cursor-pointer hover:bg-accent"
+                className="p-4 cursor-pointer hover:bg-accent transition-colors"
                 onClick={() => loadTableData('endpoints')}
               >
                 <h4 className="font-medium">endpoints</h4>
@@ -176,17 +208,18 @@ export function DatabaseView() {
               </Card>
             </div>
 
-            {selectedTable && tableData.length > 0 && (
+            {isLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            )}
+
+            {!isLoading && selectedTable && tableData.length > 0 && (
               <div className="mt-6">
                 <h4 className="font-medium mb-4">Table: {selectedTable}</h4>
                 <div className="border rounded-md overflow-hidden">
                   <DataGrid
-                    columns={Object.keys(tableData[0]).map(key => ({
-                      key,
-                      name: key,
-                      resizable: true,
-                      sortable: true
-                    }))}
+                    columns={getTableColumns(tableData)}
                     rows={tableData}
                     className="min-h-[400px]"
                   />
