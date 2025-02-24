@@ -15,6 +15,14 @@ import { SchemaEditor } from "@/components/ui/schema-editor";
 import 'react-data-grid/lib/styles.css';
 import { useQueryClient } from '@tanstack/react-query';
 
+interface Schema {
+  id?: string;
+  name: string;
+  schema: any;
+  version: number;
+  createdAt: Date;
+}
+
 function flattenObject(obj: any, prefix = ''): any {
   if (!obj || typeof obj !== 'object') return { [prefix]: obj };
 
@@ -115,7 +123,7 @@ export default function Preview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: `Context: ${JSON.stringify(data)}\n\nEnhancement request: ${enhancePrompt}`,
-          context: data 
+          context: data
         })
       });
 
@@ -168,7 +176,7 @@ export default function Preview() {
       const response = await fetch("/api/generate-schema", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data }) 
+        body: JSON.stringify({ data })
       });
 
       if (!response.ok) {
@@ -199,7 +207,7 @@ export default function Preview() {
     }
   };
 
-  const handleSaveSchema = async (schema: any) => {
+  const handleSaveSchema = async (schema: Schema) => {
     try {
       const response = await fetch("/api/schemas", {
         method: "POST",

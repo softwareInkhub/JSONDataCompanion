@@ -73,6 +73,10 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
 
   const handleSave = () => {
     try {
+      if (!name.trim()) {
+        throw new Error("Schema name is required");
+      }
+
       const parsedSchema = JSON.parse(schemaContent);
       const validSchema = z.object({
         type: z.literal("object"),
@@ -83,7 +87,7 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
 
       onSave({
         id: schema?.id || "",
-        name,
+        name: name.trim(),
         schema: validSchema,
         version: (schema?.version || 0) + 1,
         createdAt: schema?.createdAt || new Date()
@@ -94,10 +98,10 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
         title: "Success",
         description: "Schema saved successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Invalid schema format",
+        description: error.message || "Invalid schema format",
         variant: "destructive"
       });
     }
@@ -107,7 +111,7 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
     <div className="space-y-4">
       <div className="grid gap-2">
         <Label>Property Name</Label>
-        <Input 
+        <Input
           value={propertyName}
           onChange={(e) => {
             const newName = e.target.value;
@@ -128,7 +132,7 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
 
       <div className="grid gap-2">
         <Label>Type</Label>
-        <Select 
+        <Select
           value={property.type}
           onValueChange={(value: any) => handlePropertyUpdate(propertyName, { type: value })}
         >
@@ -228,7 +232,6 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
       )}
     </div>
   );
-
   return (
     <Card className="p-4">
       <div className="flex justify-between items-start mb-4">
@@ -322,7 +325,6 @@ export function SchemaEditor({ schema, onSave, onDelete }: SchemaEditorProps) {
           )}
         </DialogContent>
       </Dialog>
-
       <pre className="text-sm bg-muted p-2 rounded-md overflow-auto max-h-32">
         {schemaContent}
       </pre>
