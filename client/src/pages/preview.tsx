@@ -78,7 +78,7 @@ export default function Preview() {
   const [showSchemaDialog, setShowSchemaDialog] = useState(false);
   const [generatedSchema, setGeneratedSchema] = useState<any>(null);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false); // Added loading state for enhance button
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -114,13 +114,23 @@ export default function Preview() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: enhancePrompt,
-          context: data
+          prompt: `Context: ${JSON.stringify(data)}\n\nEnhancement request: ${enhancePrompt}`,
+          context: data 
         })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to enhance data');
+      }
+
       const result = await response.json();
-      setData(result);
-      setEditableJson(JSON.stringify(result, null, 2));
+
+      if (!result.jsonData) {
+        throw new Error('Invalid response from AI');
+      }
+
+      setData(result.jsonData);
+      setEditableJson(JSON.stringify(result.jsonData, null, 2));
       setEnhancePrompt("");
       toast({
         title: "Success",
@@ -158,7 +168,7 @@ export default function Preview() {
       const response = await fetch("/api/generate-schema", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data })
+        body: JSON.stringify({ data }) 
       });
 
       if (!response.ok) {
@@ -166,8 +176,12 @@ export default function Preview() {
         throw new Error(error.error || "Failed to generate schema");
       }
 
-      const schema = await response.json();
-      setGeneratedSchema(schema);
+      const result = await response.json();
+      if (!result.schema) {
+        throw new Error('Invalid schema generated');
+      }
+
+      setGeneratedSchema(result);
       setShowSchemaDialog(true);
 
       toast({

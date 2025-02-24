@@ -291,18 +291,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/generate", async (req, res) => {
     try {
-      const { prompt, filterOptions, sortOptions, schemaId } = req.body;
+      const { prompt, context } = req.body;
+
+      if (!prompt) {
+        return res.status(400).json({ error: "No prompt provided" });
+      }
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are a JSON data generator. Generate or modify structured JSON data based on the user's prompt and context."
+            content: "You are a JSON data enhancer. Analyze the existing data structure and enhance it based on the user's request. Maintain the same structure but add or modify data as requested."
           },
           {
             role: "user",
-            content: prompt.includes("Context:") ? prompt : `Generate JSON data for: ${prompt}`
+            content: prompt
           }
         ],
         response_format: { type: "json_object" }
@@ -310,20 +314,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let jsonData = JSON.parse(completion.choices[0].message.content || "{}");
 
-      // Validate against schema if provided
-      if (schemaId) {
-        const schema = await storage.getSchema(schemaId);
-        if (schema) {
-          jsonData = await validateJsonWithSchema(jsonData, schema);
-        }
-      }
-
+      // Create endpoint with enhanced data
       const endpoint = await storage.createEndpoint({
         name: prompt,
         jsonData,
-        schemaId: schemaId || null,
-        filterOptions: filterOptions || null,
-        sortOptions: sortOptions || null
+        schemaId: null,
+        filterOptions: null,
+        sortOptions: null
       });
 
       res.json({
