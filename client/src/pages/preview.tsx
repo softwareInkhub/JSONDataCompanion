@@ -78,6 +78,7 @@ export default function Preview() {
   const [showSchemaDialog, setShowSchemaDialog] = useState(false);
   const [generatedSchema, setGeneratedSchema] = useState<any>(null);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false); // Added loading state for enhance button
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -108,6 +109,7 @@ export default function Preview() {
 
   const handleEnhance = async () => {
     try {
+      setIsEnhancing(true);
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -130,6 +132,8 @@ export default function Preview() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsEnhancing(false);
     }
   };
 
@@ -189,7 +193,7 @@ export default function Preview() {
         body: JSON.stringify({
           ...schema,
           name: schema.name || `Schema for ${location.split("/").pop()}`,
-          id: undefined 
+          id: undefined
         })
       });
 
@@ -292,8 +296,8 @@ export default function Preview() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Preview & Enhance</h1>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleGenerateSchema}
               disabled={isGeneratingSchema}
             >
@@ -412,10 +416,19 @@ export default function Preview() {
               <Button
                 variant="outline"
                 onClick={handleEnhance}
-                disabled={!enhancePrompt}
+                disabled={!enhancePrompt || isEnhancing}
               >
-                <Wand2 className="h-4 w-4 mr-2" />
-                Enhance with AI
+                {isEnhancing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Enhancing...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    Enhance with AI
+                  </>
+                )}
               </Button>
             </div>
           </div>
