@@ -215,8 +215,8 @@ export default function Preview() {
         body: JSON.stringify({
           name: schema.name || `Schema for ${location.split("/").pop()}`,
           schema: schema.schema,
-          version: 1,
-          createdAt: new Date()
+          version: 1
+          // Don't send createdAt, let the server handle it with defaultNow()
         })
       });
 

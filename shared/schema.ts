@@ -22,7 +22,7 @@ export const endpoints = pgTable("endpoints", {
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
 
-// Schema validation types
+// Schema property type validation
 export const schemaPropertySchema = z.object({
   type: z.enum(["string", "number", "boolean", "array", "object", "null"]),
   description: z.string().optional(),
@@ -38,6 +38,7 @@ export const schemaPropertySchema = z.object({
   properties: z.record(z.lazy(() => schemaPropertySchema)).optional(),
 });
 
+// Schema validation schema
 export const insertSchemaSchema = createInsertSchema(schemas).extend({
   schema: z.object({
     type: z.literal("object"),
