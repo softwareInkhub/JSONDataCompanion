@@ -93,7 +93,13 @@ export function DatabaseView() {
       name: key,
       resizable: true,
       sortable: true,
-      width: key === 'schema' ? 300 : undefined
+      width: key === 'schema' ? 300 : undefined,
+      formatter(props: any) {
+        const value = props.row[key];
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+      }
     }));
   };
 
@@ -224,6 +230,12 @@ export function DatabaseView() {
                     className="min-h-[400px]"
                   />
                 </div>
+              </div>
+            )}
+
+            {!isLoading && selectedTable && tableData.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No data available in this table
               </div>
             )}
           </div>
