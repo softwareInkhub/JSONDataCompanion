@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import MonacoEditor from '@monaco-editor/react';
 import { DataGrid } from 'react-data-grid';
 import { Database, Table2, Play, Loader2 } from "lucide-react";
+import 'react-data-grid/lib/styles.css';
 
 interface TableInfo {
   tableName: string;
@@ -94,8 +95,8 @@ export function DatabaseView() {
       resizable: true,
       sortable: true,
       width: key === 'schema' ? 300 : undefined,
-      formatter(props: any) {
-        const value = props.row[key];
+      formatter: ({ row }: { row: any }) => {
+        const value = row[key];
         if (value === null || value === undefined) return '';
         if (typeof value === 'object') return JSON.stringify(value);
         return String(value);
@@ -183,7 +184,7 @@ export function DatabaseView() {
             {queryResult && (
               <div className="mt-4">
                 <h4 className="font-medium mb-2">Result:</h4>
-                <pre className="bg-muted p-4 rounded-md overflow-auto max-h-[300px]">
+                <pre className="bg-muted p-4 rounded-md overflow-auto max-h-[300px] text-sm">
                   {JSON.stringify(queryResult, null, 2)}
                 </pre>
               </div>
@@ -223,11 +224,11 @@ export function DatabaseView() {
             {!isLoading && selectedTable && tableData.length > 0 && (
               <div className="mt-6">
                 <h4 className="font-medium mb-4">Table: {selectedTable}</h4>
-                <div className="border rounded-md overflow-hidden">
+                <div className="border rounded-md overflow-hidden h-[400px]">
                   <DataGrid
                     columns={getTableColumns(tableData)}
                     rows={tableData}
-                    className="min-h-[400px]"
+                    className="rdg-light"
                   />
                 </div>
               </div>
